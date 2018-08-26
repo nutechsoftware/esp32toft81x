@@ -124,7 +124,7 @@ void app_main()
  * Restart ESP32 chip
  */
 void restart_esp32() {
-  for (int i = 10; i >= 0; i--) {
+  for (int i = 4; i >= 0; i--) {
       printf("Restarting in %d seconds...\n", i);
       vTaskDelay(1000 / portTICK_PERIOD_MS);
   }

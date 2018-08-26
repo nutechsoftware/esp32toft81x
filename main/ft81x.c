@@ -122,7 +122,7 @@ bool ft81x_initSPI() {
     return false;
   }
   
-  gpio_set_level(GPIO_NUM_5, 1);
+  ft81x_cs(1); // inactive CS
   
   return true;
 }
@@ -172,19 +172,8 @@ bool ft81x_initGPU() {
   // Set the PWM to 0 turn off the backlight
   ft81x_wr(REG_PWM_DUTY, 0);
  
-  // Setup the FT81X GPIO PINS
-  #if 0
-  //// FIXME: Needs tech data review and change to GPIOX calls
-  ft81x_wr16(REG_GPIOX_DIR, 0x8000);
-  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x8000);
-  #else
-  // set GPIO7 to OUTPUT. Display enable? Not in the docs but needed.
-  ft81x_wr(REG_GPIO_DIR, 0x80);
-  ft81x_wr(REG_GPIO, ft81x_rd(REG_GPIO) | 0x80);
-  #endif
-  
   // Enable QUAD spi mode if configured
-  #ifdef FT81X_QUADSPI
+  #if (FT81X_QUADSPI)
     // Enable QAUD spi mode no dummy
     ft81x_wr16(REG_SPI_WIDTH, 0b010);
     ft81x_qio = 1;
@@ -195,6 +184,9 @@ bool ft81x_initGPU() {
     ft81x_wr16(REG_SPI_WIDTH, 0b0);
     ft81x_qio = 0;
   #endif
+
+  // Reset the command fifo state vars
+  ft81x_reset_fifo();
   
   // Screen specific settings
   // NHD-7.0-800480FT-CSXV-CTP
@@ -211,7 +203,6 @@ bool ft81x_initGPU() {
   ft81x_wr32(REG_VSYNC1, 10);
   ft81x_wr32(REG_DITHER, 1);
   ft81x_wr32(REG_PCLK_POL, 1);
-  ft81x_wr32(REG_PCLK, 3);
   ft81x_wr(REG_ROTATE, 0);
   ft81x_wr(REG_SWIZZLE, 0);
   
@@ -219,22 +210,150 @@ bool ft81x_initGPU() {
   int w = ft81x_rd16(REG_HSIZE);
   int h = ft81x_rd16(REG_VSIZE);
   printf("FT81X REG_HSIZE:%i  REG_VSIZE:%i\n", w, h);
+
+  // Build a black display and display it
+  ft81x_stream_start(); // Start streaming
+  ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+  ft81x_clear_color_rgb32(0x000000);
+  ft81x_clear();
+  ft81x_display();
+  ft81x_getfree(0);     // trigger FT81x to read the command buffer
+  ft81x_stream_stop();  // Finish streaming to command buffer
+
+  // Enable the backlight
+  ft81x_wr(REG_PWM_DUTY, 3);
+
+  // Setup the FT81X GPIO PINS
+  // set bit 7 to OUTPUT enable the display
+  ft81x_wr16(REG_GPIOX_DIR, 0x8000);
+  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x8000 | 0b1000);
+
+  // Enable the pixel clock
+  ft81x_wr32(REG_PCLK, 3);
+
+#if 0 // Display the built in FTDI logo animation  
+  ft81x_logo();
+#endif
+
+#if 1 // Fill the screen with a solid color
+  // SPI Debugging
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);
   
-  // Work-around issue with bitmap sizes not being reset
-  for (uint8_t i = 0; i < 32; i++) {
-    ft81x_BitmapHandle(i);  //BITMAP_HANDLE(0x05)
-    ft81x_cmd32(0x28000000UL); //BITMAP_LAYOUT_H(0x28)
-    ft81x_cmd32(0x29000000UL); //BITMAP_SIZE_H(0x29)
+  ft81x_stream_start(); // Start streaming
+  ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+  ft81x_clear_color_rgb32(0x000000);
+  ft81x_clear();
+  ft81x_color_rgb32(0xffffff);
+  ft81x_bgcolor_rgb32(0xffffff);
+  ft81x_fgcolor_rgb32(0xffffff);
+  ft81x_cmd_text(240, 100, 30, OPT_CENTERX, "Hello World");
+  ft81x_cmd_number(140, 200, 30, 0, 123);
+  ft81x_display();
+  ft81x_getfree(0);     // trigger FT81x to read the command buffer
+  ft81x_stream_stop();  // Finish streaming to command buffer
+  
+  // SPI Debugging
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);    
+#endif
+
+#if 0 // Fill the screen with a solid color cycling colors
+  uint32_t rgb = 0xff0000;
+  for (int x=0; x<300; x++) {
+    // SPI Debugging
+    gpio_set_level(GPIO_NUM_16, 1);
+    gpio_set_level(GPIO_NUM_16, 0);
+    
+    ft81x_stream_start(); // Start streaming
+    ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+    ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+    ft81x_clear_color_rgb32(rgb);
+    ft81x_clear();
+    ft81x_color_rgb32(0xffffff);
+    ft81x_bgcolor_rgb32(0xffffff);
+    ft81x_fgcolor_rgb32(0xffffff);
+    ft81x_display();
+    ft81x_getfree(0);     // trigger FT81x to read the command buffer
+    ft81x_stream_stop();  // Finish streaming to command buffer
+    
+    // rotate colors
+    rgb>>=8; if(!rgb) rgb=0xff0000;
+
+    // Sleep
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+
+    // SPI Debugging
+    gpio_set_level(GPIO_NUM_16, 1);
+    gpio_set_level(GPIO_NUM_16, 0);    
+  }
+#endif
+
+#if 0 // Draw some dots of rand size, location and color.
+  for (int x=0; x<300; x++) {
+    // SPI Debugging
+    gpio_set_level(GPIO_NUM_16, 1);
+    gpio_set_level(GPIO_NUM_16, 0);
+
+    ft81x_stream_start(); // Start streaming
+    ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+    ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+    ft81x_clear_color_rgb32(0x000000);
+    ft81x_clear();
+    
+    ft81x_fgcolor_rgb32(0xffffff);
+    ft81x_bgcolor_rgb32(0xffffff);
+    
+    uint8_t rred, rgreen, rblue;
+    rred = rand()%((253+1)-0) + 0;
+    rgreen = rand()%((253+1)-0) + 0;
+    rblue = rand()%((253+1)-0) + 0;            
+    ft81x_color_rgb888(rred, rgreen, rblue);
+    ft81x_begin(POINTS);
+
+    uint16_t size = rand()%((600+1)-0) + 0;
+    uint16_t rndx = rand()%((800+1)-0) + 0;
+    uint16_t rndy = rand()%((480+1)-0) + 0;
+    ft81x_point_size(size);    
+    ft81x_vertex2ii(rndx,rndy,0,0);
+    
+    ft81x_display();
+    ft81x_getfree(0);     // trigger FT81x to read the command buffer
+    ft81x_stream_stop();  // Finish streaming to command buffer
   }
 
-  ft81x_wr(REG_PWM_DUTY, 20);
+  // Sleep
+  vTaskDelay(10 / portTICK_PERIOD_MS);
 
-  // Initialize our command buffer pointer state vars
-  ft81x_wp = 0;
-  ft81x_freespace = 4096 - 4;
+  // SPI Debugging
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);    
+
+#endif
 
   return true;
 }
+
+/*
+ * Initialize our command buffer pointer state vars
+ * for streaming mode.
+ */
+void ft81x_reset_fifo() {
+  ft81x_wp = 0;
+  ft81x_freespace = 4096 - 4;  
+}
+
+/*
+ * Wrapper for CS to allow easier debugging
+ */
+void ft81x_cs(uint8_t n) {
+  gpio_set_level(GPIO_NUM_5, n);
+#if 1 // Testing SPI
+  ets_delay_us(10);
+#endif  
+} 
 
 /*
  * Write 16 bit command+arg and dummy byte
@@ -261,14 +380,20 @@ void ft81x_hostcmd(uint8_t command, uint8_t args) {
     
   trans.base.rx_buffer = NULL;
 
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);
+
   // start the transaction ISR watches the CS bit 
-  gpio_set_level(GPIO_NUM_5, 0); //active CS
-  
+  ft81x_cs(0);
+    
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
   
   // end the transaction
-  gpio_set_level(GPIO_NUM_5, 1); //inactive CS
+  ft81x_cs(1);
+  
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);
 
 }
 
@@ -306,7 +431,7 @@ uint8_t ft81x_rd(uint32_t addr)
   trans.base.rx_buffer = recvbuf; // RX buffer
 
   // start the transaction ISR watches CS bit
-  gpio_set_level(GPIO_NUM_5, 0); //active CS
+  ft81x_cs(0);
 
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
@@ -315,7 +440,7 @@ uint8_t ft81x_rd(uint32_t addr)
   uint8_t ret = *((uint8_t *)recvbuf);
   
   // end the transaction
-  gpio_set_level(GPIO_NUM_5, 1); //inactive CS
+  ft81x_cs(1);
   
   // cleanup
   free(recvbuf);
@@ -357,16 +482,16 @@ uint16_t ft81x_rd16(uint32_t addr)
   trans.base.rx_buffer = recvbuf; // RX buffer
 
   // start the transaction ISR watches CS bit
-  gpio_set_level(GPIO_NUM_5, 0); //active CS
+  ft81x_cs(0);
 
-  // transmite our transaction to the ISR
+  // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
   // grab our return data  
   uint16_t ret = *((uint16_t *)recvbuf);
   
   // end the transaction
-  gpio_set_level(GPIO_NUM_5, 1); //inactive CS
+  ft81x_cs(1);
   
   // cleanup
   free(recvbuf);
@@ -401,13 +526,13 @@ void ft81x_wr(uint32_t addr, uint8_t byte) {
   trans.base.tx_buffer = &byte;
   
   // start the transaction ISR watches CS bit
-  gpio_set_level(GPIO_NUM_5, 0); //active CS
+  ft81x_cs(0);
 
-  // transmite our transaction to the ISR
+  // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
   // end the transaction
-  gpio_set_level(GPIO_NUM_5, 1); //inactive CS
+  ft81x_cs(1); //inactive CS
   
 }
 
@@ -438,18 +563,18 @@ void ft81x_wr16(uint32_t addr, uint16_t word) {
   trans.base.tx_buffer = &word;
   
   // start the transaction ISR watches CS bit
-  gpio_set_level(GPIO_NUM_5, 0); //active CS
+  ft81x_cs(0); //active CS
 
-  // transmite our transaction to the ISR
+  // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
   // end the transaction
-  gpio_set_level(GPIO_NUM_5, 1); //inactive CS
+  ft81x_cs(1); //inactive CS
   
 }
 
 /*
- * Write 24 bit address + 16 bit value
+ * Write 24 bit address + 32 bit value
  * A total of 7 bytes will be on the SPI BUS.
  */
 void ft81x_wr32(uint32_t addr, uint32_t word) {
@@ -475,13 +600,13 @@ void ft81x_wr32(uint32_t addr, uint32_t word) {
   trans.base.tx_buffer = &word;
 
   // start the transaction ISR watches CS bit
-  gpio_set_level(GPIO_NUM_5, 0); //active CS
+  ft81x_cs(0); // active CS
 
-  // transmite our transaction to the ISR
+  // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
   // end the transaction
-  gpio_set_level(GPIO_NUM_5, 1); //inactive CS
+  ft81x_cs(1); // inactive CS
   
 }
 
@@ -497,48 +622,392 @@ uint16_t ft81x_rp() {
 }
 
 /*
- * ft81x_getfree space from FT81x until it reports
- * we have required space
+ * Start a new transactions to write to the command buffer at the current write pointer
+ * rw = 1 is a write operation and will set the write bit.
+ * Use tx_buffer to transmit only 24 bits.
+ */
+void ft81x_start(uint32_t addr, uint8_t write) {
+  // setup trans memory
+  spi_transaction_ext_t trans;
+  memset(&trans, 0, sizeof(trans));
+
+  // set trans options.
+  if (ft81x_qio) {
+    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
+    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
+    // Set this transaction to QIO
+    trans.base.flags |= SPI_TRANS_MODE_QIO;
+  }
+  
+  // set write bit if rw=1
+  addr |= (write ? 0x800000 : 0);
+  addr = SPI_REARRANGE_DATA(addr, 24);
+
+  trans.base.length = 24;
+  trans.base.tx_buffer = &addr;
+
+  // start the transaction ISR watches CS bit
+  ft81x_cs(0); // active CS  
+
+  // transmit our transaction to the ISR
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans); 
+}
+
+/*
+ * Start a new transactions to write to the command buffer at the current write pointer.
+ * Assert CS pin.
+ */
+void ft81x_stream_start() {
+  // be sure we ended the last tranaction
+  ft81x_stream_stop();
+  // begin a new write transaction.
+  ft81x_start(RAM_CMD + (ft81x_wp & 0xfff), WRITE_OP);
+}
+
+/*
+ * Close any open transactions.
+ * De-assert CS pin  
+ */
+void ft81x_stream_stop() {
+  // end the transaction
+  ft81x_cs(1); // inactive CS  
+}
+ 
+/*
+ * Get free space from FT81x until it reports
+ * we have required space. Also triggers processing
+ * of any display commands in the fifo buffer.
  */
 void ft81x_getfree(uint16_t required)
 {
   ft81x_wp &= 0xfff;
-  //__end(); //FIXME
+  ft81x_stream_stop();  
   ft81x_wr16(REG_CMD_WRITE, ft81x_wp & 0xffc);
   do {
-    uint16_t howfull = (ft81x_wp - ft81x_rp()) & 4095;
+    uint16_t rp = ft81x_rp();
+    uint16_t howfull = (ft81x_wp - rp) & 4095;
     ft81x_freespace = (4096 - 4) - howfull;
+#if 0
+    ESP_LOGW(TAG, "fifoA: wp:0x%04x rp:0x%04x fs:0x%04x", ft81x_wp, rp, ft81x_freespace);
+#endif
   } while (ft81x_freespace < required);
-  // stream(); //FIXME
+  ft81x_stream_start();
+}
+
+/*
+ * wrapper to send out a 32bit command into the fifo buffer
+ * while in stream() mode.
+ */
+void ft81x_cI(uint32_t word) {
+  //word = SPI_REARRANGE_DATA(word, 32);
+  ft81x_cmd32(word);
+}
+
+/*
+ * wrapper to send a 8bit command into the fifo buffer
+ * while in stream() mode.
+ */
+void ft81x_cFFFFFF(uint8_t byte) {
+  ft81x_cmd32(byte | 0xffffff00);
 }
 
 /*
  * Write 32 bit command into our command fifo buffer
- * A total of 4 bytes will be on the SPI BUS.
+ * while in stream() mode.
+ * Use tx_buffer to transmit the 32 bits.
  */
 void ft81x_cmd32(uint32_t word) {
-  if (ft81x_freespace < 4) {
+
+  // check that we have space in our fifo buffer
+  // block until the FT81X says we do.
+  if (ft81x_freespace < sizeof(word)) {
     ft81x_getfree(4);
+#if 0
+    ESP_LOGW(TAG, "free: 0x%04x", ft81x_freespace);
+#endif
   }
-  ft81x_wp += 4;
-  ft81x_freespace -= 4;
-  #if 0 // FIXME
-  union {
-    uint32_t c;
-    uint8_t b[4];
-  };
-  c = x;
-  SPI.transfer(b[0]);
-  SPI.transfer(b[1]);
-  SPI.transfer(b[2]);
-  SPI.transfer(b[3]);
-  #endif
+
+  ft81x_wp += sizeof(word);
+  ft81x_freespace -= sizeof(word);
+ 
+  // setup trans memory
+  spi_transaction_ext_t trans;
+  memset(&trans, 0, sizeof(trans));
+
+  // set trans options.
+  if (ft81x_qio) {
+    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
+    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
+    // Set this transaction to QIO
+    trans.base.flags |= SPI_TRANS_MODE_QIO;
+  }
+
+  trans.base.length = 32;
+  trans.base.tx_buffer = &word;
+
+  // transmit our transaction to the ISR
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
+
 }
 
 /*
- * Write out a bitmap handle into the command buffer
- * A total of 7 bytes will be on the SPI BUS.
+ * Write N bits command into our command fifo buffer
+ * while in stream() mode.
+ * Use tx_buffer to transmit the bits.
+ */
+void ft81x_cN(uint8_t *buffer, uint16_t size) {
+  // check that we have space in our fifo buffer
+  // block until the FT81X says we do.
+  if (ft81x_freespace < size) {
+    ft81x_getfree(size);
+    ESP_LOGW(TAG, "free: 0x%04x", ft81x_freespace);    
+  }
+  ft81x_wp += size;
+  ft81x_freespace -= size;
+ 
+  // setup trans memory
+  spi_transaction_ext_t trans;
+  memset(&trans, 0, sizeof(trans));
+
+  // set trans options.
+  if (ft81x_qio) {
+    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
+    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
+    // Set this transaction to QIO
+    trans.base.flags |= SPI_TRANS_MODE_QIO;
+  }
+
+  trans.base.length = size * 8;
+  trans.base.tx_buffer = buffer;
+
+  // transmit our transaction to the ISR
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
+
+}
+
+/*
+ * Programming Guide section 4.6 BITMAP_HANDLE
+ * Specify the bitmap handle
  */
 void ft81x_BitmapHandle(uint8_t handle) {
-  ft81x_cmd32((5UL << 24) | handle);
+  ft81x_cI((0x05UL << 24) | handle);
+}
+
+/*
+ * Swap the display
+ */
+void ft81x_swap() {
+  ft81x_display(); // end current display list
+  ft81x_cmd_swap(); // Set AUTO swap at end of display list
+  //ft81x_cmd_loadidentity();
+  ft81x_cmd_dlstart(); // Set REG_CMD_DL when done
+  ft81x_getfree(0); // trigger display processing
+}
+
+/*
+ * Programming Guide section 4.21 CLEAR
+ * Clear buffers to preset values
+ */
+void ft81x_clear() {
+  ft81x_cI((0x26UL << 24) | 7);
+}
+
+/*
+ * Programming Guide section 4.23 CLEAR_COLOR_RGB
+ * Specify clear values for red, green and blue channels
+ */
+void ft81x_clear_color_rgb32(uint32_t rgb) {
+   ft81x_cI((0x2UL << 24) | (rgb & 0xffffffL));
+}
+
+void ft81x_clear_color_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
+   ft81x_clear_color_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
+}
+
+/*
+ * Programming Guide section 4.28 COLOR_RGB
+ * Set the current color red, green, blue
+ */
+void ft81x_color_rgb32(uint32_t rgb) {
+   ft81x_cI((0x4UL << 24) | (rgb & 0xffffffL));
+}
+
+void ft81x_color_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
+   ft81x_color_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
+}
+
+/*
+ * Programming Guide section 5.30 CMD_FGCOLOR
+ * set the foreground color 
+ */
+void ft81x_fgcolor_rgb32(uint32_t rgb) {
+   ft81x_cFFFFFF(0x0a);
+   ft81x_cI(rgb << 8);
+}
+void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
+  ft81x_fgcolor_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
+}
+
+// 5.31 CMD_BGCOLOR - set the background color 
+/*
+ * Programming Guide section 5.31 CMD_BGCOLOR
+ * set the background color 
+ */
+void ft81x_bgcolor_rgb32(uint32_t rgb) {
+  ft81x_cFFFFFF(0x09);
+  ft81x_cI(rgb << 8);
+}
+void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
+   ft81x_bgcolor_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
+}
+
+/*
+ * Programming Guide section 5.12 CMD_SWAP
+ * Swap the current display list
+ */
+void ft81x_cmd_swap() {
+   ft81x_cFFFFFF(0x01);
+}
+
+/*
+ * Programming Guide section 4.29 DISPLAY
+ * End the display list. FT81X will ignore all commands following this command.
+ */
+void ft81x_display() {
+   ft81x_cI((0x0UL << 24));
+}
+
+/*
+ * Programming Guide section 5.44 CMD_LOADIDENTITY
+ * Set the current matrix to the identity matrix
+ * 
+ */
+void ft81x_cmd_loadidentity() {
+   ft81x_cFFFFFF(0x26);
+}
+
+/*
+ * Programming Guide section 5.11 CMD_DLSTART
+ * Start a new display list
+ */
+void ft81x_cmd_dlstart() {
+   ft81x_cFFFFFF(0x00);
+}
+
+/*
+ * Programming Guide section 5.11 CMD_SETROTATE
+ * Start a new display list
+ */
+void ft81x_cmd_setrotate(uint32_t r) {
+   ft81x_cFFFFFF(0x36);
+   ft81x_cI(r);
+   //FIXME: Update our own internal H/W to reflect display
+}
+
+/*
+ * Programming Guide section 5.41 CMD_TEXT
+ * Draw text
+ * FIXME: Needs padding to be 4 byte aligned
+ */
+void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const char *s) {
+   ft81x_cFFFFFF(0x0c);
+   uint16_t b[4];
+   b[0] = x;
+   b[1] = y;
+   b[2] = font;
+   b[3] = options;
+   ft81x_cN((uint8_t *)b,sizeof(b));
+   ft81x_cN((uint8_t *)s,strlen(s)+1);
+   ESP_LOGW(TAG, "FIXME PADDING: 0x%04x", strlen(s)+1);
+}
+
+/*
+ * Programming Guide section 5.43 CMD_NUMBER
+ * Draw number
+ */
+void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int32_t n) {
+   uint16_t b[6];
+   b[0] = x;
+   b[1] = y;
+   b[2] = font;
+   b[3] = options;
+   b[4] = n;
+   b[5] = 0; // dummy pad
+   ft81x_cFFFFFF(0x2e);
+   ft81x_cN((uint8_t *)&b,sizeof(b));
+}
+
+/*
+ * Programming Guide section 5.66 CMD_LOGO
+ * Play FTDI logo animation wait till it is done
+ */
+void ft81x_logo() {
+  ft81x_stream_start(); // Start streaming
+  ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+  ft81x_cFFFFFF(0x31);  // Logo command
+  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+  ft81x_getfree(0);     // trigger FT81x to read the command buffer
+  ft81x_stream_stop();  // Finish streaming to command buffer
+  // Wait till the Logo is finished  
+  ft81x_wait_finish();  
+  // AFAIK the only command that will set the RD/WR to 0 when finished
+  ft81x_reset_fifo();
+}
+
+/*
+ * Programming Guide section 4.47 VERTEX2F
+ * Start the operation of graphics primitives at the specified
+ * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
+ */
+void ft81x_vertex2f(int16_t x, int16_t y) {
+  ft81x_cI((1UL << 30) | ((x & 32767L) << 15) | ((y & 32767L) << 0));
+}
+
+/*
+ * Programming Guide section 4.48 VERTEX2ii
+ * Start the operation of graphics primitives at the specified
+ * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
+ */
+void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell) {
+  uint8_t b[4];
+  b[0] = (cell & 127) | ((handle & 1) << 7);
+  b[1] = (handle >> 1) | (y << 4);
+  b[2] = (y >> 4) | (x << 5);
+  b[3] = (2 << 6) | (x >> 3);
+  ft81x_cI(*((uint32_t *)&b[0]));
+}
+ 
+/*
+ * Programming Guide section 4.36 POINT_SIZE
+ * Specify the radius of points
+ */
+void ft81x_point_size(uint16_t size) {
+  ft81x_cI((0x0dUL << 24) | ((size & 8191L) << 0));
+}
+
+/*
+ * Programming Guide section 4.5 BEGIN
+ * Begin drawing a graphics primitive
+ */
+void ft81x_begin( uint8_t prim) {
+  ft81x_cI((0x1fUL << 24) | prim);
+}
+
+/*
+ * Programming Guide section 4.30 END
+ * End drawing a graphics primitive
+ */
+void ft81x_end() {
+  ft81x_cI((0x21UL << 24));
+}
+
+/*
+ * Finish. Wait till READ and WRITE pointers are 0.
+ * presumes not currently streaming commands
+ */
+void ft81x_wait_finish() {
+  // Block until animation is done READ and WRITE will be 0  
+  while ( (ft81x_rd16(REG_CMD_WRITE) != 0) ||
+          (ft81x_rd16(REG_CMD_READ) != 0)
+        );  
 }

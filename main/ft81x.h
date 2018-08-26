@@ -37,10 +37,51 @@
  */ 
 
 // General settings/utils
-#define FT81X_SPI_SPEED 2000000 // 2mhz testing
-#define FT81X_QUADSPI 1         // Enable QUAD spi mode on ESP32 and FT81X
+//// 5-8mhz is the best I see so far
+#define FT81X_SPI_SPEED 8000000
+
+//// QUAD SPI is not stable yet. Noise or ...?
+//// Enable QUAD spi mode on ESP32 and FT81X
+#define FT81X_QUADSPI 0            
+
 #define SPI_SHIFT_DATA(data, len) __builtin_bswap32((uint32_t)data<<(32-len))
 #define SPI_REARRANGE_DATA(data, len) (__builtin_bswap32(data)>>(32-len))
+#define WRITE_OP 1
+#define READ_OP 0
+#define ORIENTATION 0
+
+// OPTIONS
+#define OPT_3D            0
+#define OPT_RGB565        0
+#define OPT_MONO          1
+#define OPT_NODL          2
+#define OPT_FLAT        256
+#define OPT_SIGNED      256
+#define OPT_CENTERX     512
+#define OPT_CENTERY    1024
+#define OPT_CENTER     1536
+#define OPT_RIGHTX     2048
+#define OPT_NOBACK     4096
+#define OPT_NOTICKS    8192
+#define OPT_NOHM      16384
+#define OPT_NOPOINTER 16384
+#define OPT_NOSECS    32768
+#define OPT_NOHANDS   49152
+#define OPT_NOTEAR        4
+#define OPT_FULLSCREEN    8
+#define OPT_MEDIAFIFO    16
+#define OPT_SOUND        32
+
+// Table 6 FT81X graphics primitive operation definition
+#define BITMAPS           1
+#define POINTS            2
+#define LINES             3
+#define LINE_STRIP        4
+#define EDGE_STRIP_R      5
+#define EDGE_STRIP_L      6
+#define EDGE_STRIP_A      7
+#define EDGE_STRIP_B      8
+#define RECTS             9
 
 
 // MEMORY MAP DEFINES
@@ -122,6 +163,12 @@ bool ft81x_initSPI();
 // Initialize FT81X GPU
 bool ft81x_initGPU();
 
+// reset the fifo state vars
+void ft81x_reset_fifo();
+
+// Wrapper for CS to allow easier debugging
+void ft81x_cs(uint8_t n);
+
 // Send a Host Command to the FT81X chip see 4.1.5 Host Command
 void ft81x_hostcmd(uint8_t command, uint8_t args);
 
@@ -140,18 +187,103 @@ void ft81x_wr16(uint32_t addr, uint16_t word);
 // Send a 16 bit address and write 32 bits of data
 void ft81x_wr32(uint32_t addr, uint32_t word);
 
-// Send a 32 word into our command buffer
-void ft81x_cmd32(uint32_t word);
-
-// Send out a bitmap handle command into our command fifo
-void ft81x_BitmapHandle(uint8_t byte);
-
 // Read the FT81x command pointer
 uint16_t ft81x_rp();
 
-// get command buffer free block till we have 'required' space
+// Set the address and write mode pointer to the command buffer
+// leaving the CS line enabled for further data
+void ft81x_start(uint32_t addr, uint8_t write);
+
+// Set the current address and write mode to the fifo comand buffer
+// leaving the CS line enabled
+void ft81x_stream_start();
+
+// Disable the CS line finish the transaction
+void ft81x_stream_stop();
+
+// Get command buffer free block till we have 'required' space
 void ft81x_getfree(uint16_t required);
 
+// Write a 32bit command to the command buffer blocking if
+// free space is needed until enough is free to send the 4 bytes
+void ft81x_cI(uint32_t word);
+
+// Write a 8bit+24bits of 0xff to the command buffer blocking if
+// free space is needed until enough is free to send the 4 bytes
+void ft81x_cFFFFFF(uint8_t byte);
+
+// While in stream() mode send a 32 word into the command buffer.
+void ft81x_cmd32(uint32_t word);
+
+// While in stream() mode send a char buffer into the command buffer.
+void ft81x_cN(uint8_t *buffer, uint16_t size);
+
+// While in stream() mode send out a bitmap handle command into the command fifo
+void ft81x_BitmapHandle(uint8_t byte);
+
+// Series of commands to swap the display
+void ft81x_swap();
+
+// 4.21 CLEAR - Clears buffers to preset values
+void ft81x_clear();
+
+// 4.23 CLEAR_COLOR_RGB - Specify clear values for red,green and blue channels
+void ft81x_clear_color_rgb32(uint32_t rgb);
+void ft81x_clear_color_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 4.28 COLOR_RGB - Set the current color red, green, blue
+void ft81x_color_rgb32(uint32_t rgb);
+void ft81x_color_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 5.30 CMD_FGCOLOR - set the foreground color 
+void ft81x_fgcolor_rgb32(uint32_t rgb);
+void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 5.31 CMD_BGCOLOR - set the background color 
+void ft81x_bgcolor_rgb32(uint32_t rgb);
+void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 5.12 CMD_SWAP - swap the current display list
+void ft81x_cmd_swap();
+
+// 4.29 DISPLAY - End the display list. FT81X will ignore all commands following this command.
+void ft81x_display();
+
+// 5.44 CMD_LOADIDENTITY - Set the current matrix to the identity matrix
+void ft81x_cmd_loadidentity();
+
+// 5.11 CMD_DLSTART - start a new display list
+void ft81x_cmd_dlstart();
+
+// 5.53 CMD_SETROTATE - rotate the screen
+void ft81x_cmd_setrotate(uint32_t r);
+
+// 5.41 CMD_TEXT - draw text
+void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const char *s);
+
+// 5.43 CMD_NUMBER - draw number
+void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int32_t n);
+
+// 5.66 CMD_LOGO - play FTDI logo animation
+void ft81x_logo();
+
+// 4.47 VERTEX2F - Start the operation of graphics primitives at the specified screen coordinate
+void ft81x_vertex2f(int16_t x, int16_t y);
+
+// 4.48 VERTEX2II - Start the operation of graphics primitives at the specified screen coordinate
+void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell);
+
+// 4.36 POINT_SIZE - Specify the radius of points
+void ft81x_point_size(uint16_t size);
+
+// 4.5 BEGIN - Begin drawing a graphics primitive
+void ft81x_begin( uint8_t prim);
+
+// 4.30 END - End drawing a graphics primitive
+void ft81x_end();
+
+// Wait for READ and WRITE command ptrs to be 0
+void ft81x_wait_finish();
 
 extern uint16_t ft81x_chip_id;
 
