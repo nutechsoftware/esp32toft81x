@@ -1,11 +1,11 @@
 # ESP32 FT81X driver and sample
 Display "Hello World" on a [**NHD-7.0-800480FT-CSXV-CTP**](http://newhavendisplay.com/learnmore/EVE2_7-CSXV-CTP/) display using a [**ESP32 Thing**](https://www.sparkfun.com/products/13907).
 
-This code provides an API to communicate with the FT81X chip from an ESP32 Thing. It simplifies the complexity of SPI on the ESP32 by formatting the SPI communications to work correctly with the FT81X. It also allow for QUAD SPI communications where permitted to increase data transfer speeds.
+This code provides an API to communicate with the FT81X chip from an ESP32 Thing. It simplifies the complexity of SPI on the ESP32 by formatting the SPI communications to work correctly with the FT81X. It also allows for QUAD SPI communications where permitted to increase data transfer speeds.
 
 ## Wiring development environment
 - Using the VSPI pins of the ESP32 connected to the FT81X display
-  
+
 | COLOR  | ESP_SIGNAL | ESP_32_PIN | DISPLAY_PIN | DISPLAY_SIGNAL |
 | ------ | ---------- | ---------- | ----------- | -------------- |
 | RED    | VCC 3.3v   | 3v3        | 1           | 3v3            |
@@ -36,7 +36,7 @@ foo@bar:~$ make flash
 - Power / Noise
  - You can power the ESP32 and NHD-7.0 from the ESP32 Thing connected to a USB port
    - Insufficient current will result in unpredictable behavior that may cause damage
-   - Connect ***BL_VDD*** to ***3v3*** 
+   - Connect ***BL_VDD*** to ***3v3***
    - Keep the display PWM low(<20)
    - Use proper bypass caps near power connection of the ESP32 Thing
  - A **REG_PWM_DUTY** of 20 uses ~280ma and a PWM of 128 uses ~950ma.
@@ -45,8 +45,8 @@ foo@bar:~$ make flash
 ## Contributors
  - Submit issues and contribute improvements on [github/nutechsoftware](https://github.com/nutechsoftware)
 
-## Authors 
+## Authors
  - Sean Mathews <coder@f34r.com> - Initial skeleton and R&D
-  
+
 ## License
  - [Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
