@@ -38,11 +38,11 @@
 
 // General settings/utils
 //// 5-8mhz is the best I see so far
-#define FT81X_SPI_SPEED 8000000
+#define FT81X_SPI_SPEED 1000000
 
 //// QUAD SPI is not stable yet. Noise or ...?
 //// Enable QUAD spi mode on ESP32 and FT81X
-#define FT81X_QUADSPI 0            
+#define FT81X_QUADSPI 0
 
 #define SPI_SHIFT_DATA(data, len) __builtin_bswap32((uint32_t)data<<(32-len))
 #define SPI_REARRANGE_DATA(data, len) (__builtin_bswap32(data)>>(32-len))
@@ -224,16 +224,71 @@ void ft81x_BitmapHandle(uint8_t byte);
 // Series of commands to swap the display
 void ft81x_swap();
 
+// 4.5 BEGIN - Begin drawing a graphics primitive
+void ft81x_begin( uint8_t prim);
+
+// 4.6 BEGIN_HANDLE - Specify the bitmap handle
+void ft81x_bitmap_handle(uint8_t handle);
+
 // 4.21 CLEAR - Clears buffers to preset values
 void ft81x_clear();
+void ft81x_clearCST(uint8_t color, uint8_t stencil, uint8_t tag);
 
 // 4.23 CLEAR_COLOR_RGB - Specify clear values for red,green and blue channels
 void ft81x_clear_color_rgb32(uint32_t rgb);
 void ft81x_clear_color_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 
+// 4.24 CLEAR_STENCIL - Specify clear value for the stencil buffer
+void ft81x_clear_stencil(uint8_t stencil);
+
+// 4.25 CLEAR_TAG - Specify clear value for the tag buffer
+void ft81x_clear_tag(uint8_t tag);
+
+// 4.26 COLOR_A - Set the current color alpha
+void ft81x_color_a(uint8_t alpha);
+
+// 4.27 COLOR_MASK - Enable or disable writing of color components
+void ft81x_color_mask(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha);
+
 // 4.28 COLOR_RGB - Set the current color red, green, blue
 void ft81x_color_rgb32(uint32_t rgb);
 void ft81x_color_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 4.29 DISPLAY - End the display list. FT81X will ignore all commands following this command.
+void ft81x_display();
+
+// 4.30 END - End drawing a graphics primitive
+void ft81x_end();
+
+// 4.34 NOP - No Operation
+void ft81x_nop();
+
+// 4.36 POINT_SIZE - Specify the radius of points
+void ft81x_point_size(uint16_t size);
+
+// 4.45 TAG - Attach the tag value for the following graphics objects drawn on the screen. def. 0xff
+void ft81x_tag(uint8_t s);
+
+// 4.47 VERTEX2F - Start the operation of graphics primitives at the specified screen coordinate
+void ft81x_vertex2f(int16_t x, int16_t y);
+
+// 4.48 VERTEX2II - Start the operation of graphics primitives at the specified screen coordinate
+void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell);
+
+// 5.11 CMD_DLSTART - start a new display list
+void ft81x_cmd_dlstart();
+
+// 5.12 CMD_SWAP - swap the current display list
+void ft81x_cmd_swap();
+
+//5.21 CMD_PLAYVIDEO - Video playback
+void ft81x_cmd_playvideo(uint32_t options, uint8_t *data);
+
+// 5.22 CMD_VIDEOSTART - Initialize the AVI video decoder
+void ft81x_cmd_videostart();
+
+// 5.23 CMD_VIDEOFRAME
+void ft81x_cmd_videoframe(uint32_t dst, uint32_t ptr);
 
 // 5.30 CMD_FGCOLOR - set the foreground color 
 void ft81x_fgcolor_rgb32(uint32_t rgb);
@@ -243,44 +298,71 @@ void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 void ft81x_bgcolor_rgb32(uint32_t rgb);
 void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 
-// 5.12 CMD_SWAP - swap the current display list
-void ft81x_cmd_swap();
-
-// 4.29 DISPLAY - End the display list. FT81X will ignore all commands following this command.
-void ft81x_display();
-
-// 5.44 CMD_LOADIDENTITY - Set the current matrix to the identity matrix
-void ft81x_cmd_loadidentity();
-
-// 5.11 CMD_DLSTART - start a new display list
-void ft81x_cmd_dlstart();
-
-// 5.53 CMD_SETROTATE - rotate the screen
-void ft81x_cmd_setrotate(uint32_t r);
-
 // 5.41 CMD_TEXT - draw text
 void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const char *s);
 
 // 5.43 CMD_NUMBER - draw number
 void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int32_t n);
 
+// 5.44 CMD_LOADIDENTITY - Set the current matrix to the identity matrix
+void ft81x_cmd_loadidentity();
+
+// 5.48 CMD_GETPROPS FIXME - Get the image properties decompressed by CMD_LOADIMAGE
+void ft81x_cmd_getprops(uint32_t *ptr, uint32_t *width, uint32_t *height);
+
+// 5.49 CMD_SCALE - Apply a scale to the current matrix
+void ft81x_cmd_scale(int32_t sx, int32_t sy);
+
+// 5.50 CMD_ROTATE - Apply a rotation to the current matrix
+void ft81x_cmd_rotate(int32_t a);
+
+// 5.51 CMD_TRANSLATE - Apply a translation to the current matrix
+void ft81x_cmd_translate(int32_t tx, int32_t ty);
+
+// 5.52 CMD_CALIBRATE - execute the touch screen calibration routine
+void ft81x_cmd_calibrate(uint32_t *result);
+
+// 5.53 CMD_SETROTATE - rotate the screen
+void ft81x_cmd_setrotate(uint32_t r);
+
+// 5.54 CMD_SPINNER - Start an animated spinner
+void ft81x_cmd_spinner(int16_t x, int16_t y, int16_t style, int16_t scale);
+
+// 5.55 CMD_SCREENSAVER - Start an animated screensaver
+void ft81x_cmd_screensaver();
+
+// 5.56 CMD_SKETCH - Start a continuous sketch update
+void ft81x_cmd_sketch(int16_t x, int16_t y, int16_t w, int16_t h, int16_t ptr, int16_t format);
+
+// 5.57 CMD_STOP - Stop any active spinner, screensaver or sketch
+void ft81x_cmd_stop();
+
+// 5.58 CMD_SETFONT - Set up a custom font
+void ft81x_cmd_setfont(uint32_t font, uint32_t ptr);
+
+// 5.59 CMD_SETFONT2 - set up a custom font
+void ft81x_cmd_setfont2(uint32_t handle, uint32_t font, uint32_t ptr, uint32_t firstchar);
+
+// 5.60 CMD_SETSCRATCH - Set the scratch bitmap for widget use
+void ft81x_cmd_setscratch(uint32_t handle);
+  
+// 5.61 CMD_ROMFONT
+void ft81x_cmd_romfont(uint32_t font, uint32_t slot);
+
+// 5.62 CMD_TRACK - Track touches for a graphics object
+void ft81x_cmd_track(int16_t x, int16_t y, int16_t width, int16_t height, int16_t tag);
+
+// 5.63 CMD_SNAPSHOT - Take a snapshot of the current screen
+void ft81x_cmd_snapshot(uint32_t ptr);
+
+// 5.64 CMD_SNAPSHOT2 - Take a snapshot of the current screen
+void ft81x_cmd_snapshot2(uint32_t fmt, uint32_t ptr, uint16_t x, uint16_t y, uint16_t width, uint16_t height);
+
+// 5.65 CMD_SETBITMAP - Set up display list for bitmap
+void ft81x_cmd_setbitmap(uint32_t addr, uint16_t fmt, uint16_t width, uint16_t height);
+
 // 5.66 CMD_LOGO - play FTDI logo animation
 void ft81x_logo();
-
-// 4.47 VERTEX2F - Start the operation of graphics primitives at the specified screen coordinate
-void ft81x_vertex2f(int16_t x, int16_t y);
-
-// 4.48 VERTEX2II - Start the operation of graphics primitives at the specified screen coordinate
-void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell);
-
-// 4.36 POINT_SIZE - Specify the radius of points
-void ft81x_point_size(uint16_t size);
-
-// 4.5 BEGIN - Begin drawing a graphics primitive
-void ft81x_begin( uint8_t prim);
-
-// 4.30 END - End drawing a graphics primitive
-void ft81x_end();
 
 // Wait for READ and WRITE command ptrs to be 0
 void ft81x_wait_finish();

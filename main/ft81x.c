@@ -236,7 +236,7 @@ bool ft81x_initGPU() {
   ft81x_logo();
 #endif
 
-#if 1 // Fill the screen with a solid color
+#if 0 // Draw a black screen and write Hello World and 123 on it
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
@@ -244,12 +244,12 @@ bool ft81x_initGPU() {
   ft81x_stream_start(); // Start streaming
   ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
   ft81x_cmd_swap();     // Set AUTO swap at end of display list    
-  ft81x_clear_color_rgb32(0x000000);
+  ft81x_clear_color_rgb32(0x0000ff);
   ft81x_clear();
   ft81x_color_rgb32(0xffffff);
   ft81x_bgcolor_rgb32(0xffffff);
   ft81x_fgcolor_rgb32(0xffffff);
-  ft81x_cmd_text(240, 100, 30, OPT_CENTERX, "Hello World");
+  //ft81x_cmd_text(240, 100, 30, OPT_CENTERX, "Hello World");
   ft81x_cmd_number(140, 200, 30, 0, 123);
   ft81x_display();
   ft81x_getfree(0);     // trigger FT81x to read the command buffer
@@ -291,7 +291,7 @@ bool ft81x_initGPU() {
   }
 #endif
 
-#if 0 // Draw some dots of rand size, location and color.
+#if 1 // Draw some dots of rand size, location and color.
   for (int x=0; x<300; x++) {
     // SPI Debugging
     gpio_set_level(GPIO_NUM_16, 1);
@@ -322,6 +322,8 @@ bool ft81x_initGPU() {
     ft81x_display();
     ft81x_getfree(0);     // trigger FT81x to read the command buffer
     ft81x_stream_stop();  // Finish streaming to command buffer
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
   }
 
   // Sleep
@@ -786,11 +788,14 @@ void ft81x_cN(uint8_t *buffer, uint16_t size) {
 }
 
 /*
- * Programming Guide section 4.6 BITMAP_HANDLE
- * Specify the bitmap handle
+ * Finish. Wait till READ and WRITE pointers are 0.
+ * presumes not currently streaming commands
  */
-void ft81x_BitmapHandle(uint8_t handle) {
-  ft81x_cI((0x05UL << 24) | handle);
+void ft81x_wait_finish() {
+  // Block until animation is done READ and WRITE will be 0  
+  while ( (ft81x_rd16(REG_CMD_WRITE) != 0) ||
+          (ft81x_rd16(REG_CMD_READ) != 0)
+        );  
 }
 
 /*
@@ -805,15 +810,48 @@ void ft81x_swap() {
 }
 
 /*
- * Programming Guide section 4.21 CLEAR
+ * Programming Guide sections
+ *
+ */
+
+/*
+ * 4.5 BEGIN
+ * Begin drawing a graphics primitive
+ */
+void ft81x_begin( uint8_t prim) {
+  ft81x_cI((0x1fUL << 24) | prim);
+}
+
+/*
+ * 4.6 BITMAP_HANDLE
+ * Specify the bitmap handle
+ */
+void ft81x_bitmap_handle(uint8_t handle) {
+  ft81x_cI((0x05UL << 24) | handle);
+}
+
+/*
+ * 4.21 CLEAR
  * Clear buffers to preset values
  */
 void ft81x_clear() {
   ft81x_cI((0x26UL << 24) | 7);
 }
 
+void ft81x_clearCST(uint8_t color, uint8_t stencil, uint8_t tag) {
+  uint8_t cst = 0;
+  
+  cst = color & 0x01;
+  cst <<=1;
+  cst |= (stencil & 0x01);
+  cst <<=1;
+  cst |= (tag & 0x01);
+    
+  ft81x_cI((0x26UL << 24) | cst);
+}
+
 /*
- * Programming Guide section 4.23 CLEAR_COLOR_RGB
+ * 4.23 CLEAR_COLOR_RGB
  * Specify clear values for red, green and blue channels
  */
 void ft81x_clear_color_rgb32(uint32_t rgb) {
@@ -821,11 +859,53 @@ void ft81x_clear_color_rgb32(uint32_t rgb) {
 }
 
 void ft81x_clear_color_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
-   ft81x_clear_color_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
+   ft81x_clear_color_rgb32(((red & 1L) << 3) | ((green & 1L) << 2) | ((blue & 1L) << 0));
+}
+
+
+/*
+ * 4.24 CLEAR_STENCIL
+ * Specify clear value for the stencil buffer
+ */
+void ft81x_clear_stencil(uint8_t stencil) {
+  ft81x_cI((0x11UL << 24) | ((stencil & 0xffL) << 0));
 }
 
 /*
- * Programming Guide section 4.28 COLOR_RGB
+ * 4.25 CLEAR_TAG
+ * Specify clear value for the tag buffer
+ */
+void ft81x_clear_tag(uint8_t tag) {
+  ft81x_cI((0x12UL << 24) | ((tag & 0xffL) << 0));
+}
+
+/*
+ * 4.26 COLOR_A
+ * Set the current color alpha
+ */
+void ft81x_color_a(uint8_t alpha) {
+  ft81x_cI((0x10UL << 24) | ((alpha & 0xffL) << 0));
+}
+
+/*
+ * 4.27 COLOR_MASK
+ * Enable or disable writing of color components
+ */
+void ft81x_color_mask(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
+   ft81x_cI((0x20L << 24) | (((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0) | ((alpha & 1L) << 0)));
+}
+
+/*
+ * 4.47 VERTEX2F
+ * Start the operation of graphics primitives at the specified
+ * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
+ */
+void ft81x_vertex2f(int16_t x, int16_t y) {
+  ft81x_cI((0x1UL << 30) | ((x & 32767L) << 15) | ((y & 32767L) << 0));
+}
+
+/*
+ * 4.28 COLOR_RGB
  * Set the current color red, green, blue
  */
 void ft81x_color_rgb32(uint32_t rgb) {
@@ -837,7 +917,70 @@ void ft81x_color_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 /*
- * Programming Guide section 5.30 CMD_FGCOLOR
+ * 4.29 DISPLAY
+ * End the display list. FT81X will ignore all commands following this command.
+ */
+void ft81x_display() {
+   ft81x_cI((0x0UL << 24));
+}
+
+/*
+ * 4.30 END
+ * End drawing a graphics primitive
+ */
+void ft81x_end() {
+  ft81x_cI((0x21UL << 24));
+}
+
+/*
+ * 4.34 NOP
+ * No Operation
+ */
+void ft81x_nop() {
+  ft81x_cI((0x2dUL << 24));
+}
+
+/*
+* 4.36 POINT_SIZE
+* Specify the radius of points
+*/
+void ft81x_point_size(uint16_t size) {
+ ft81x_cI((0x0dUL << 24) | ((size & 8191L) << 0));
+}
+
+/*
+ * 4.45 TAG
+ * Attach the tag value for the following graphics objects
+ * drawn on the screen. The initial tag buffer value is 255.
+ */
+void ft81x_tag(uint8_t s) {
+   ft81x_cI((0x3UL << 24) | ((s & 255L) << 0));
+}
+
+/*
+ * 4.48 VERTEX2ii
+ * Start the operation of graphics primitives at the specified
+ * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
+ */
+void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell) {
+  uint8_t b[4];
+  b[0] = (cell & 127) | ((handle & 1) << 7);
+  b[1] = (handle >> 1) | (y << 4);
+  b[2] = (y >> 4) | (x << 5);
+  b[3] = (2 << 6) | (x >> 3);
+  ft81x_cI(*((uint32_t *)&b[0]));
+}
+
+/*
+ * 5.12 CMD_SWAP
+ * Swap the current display list
+ */
+void ft81x_cmd_swap() {
+   ft81x_cFFFFFF(0x01);
+}
+
+/*
+ * 5.30 CMD_FGCOLOR
  * set the foreground color 
  */
 void ft81x_fgcolor_rgb32(uint32_t rgb) {
@@ -848,10 +991,45 @@ void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
   ft81x_fgcolor_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
 }
 
-// 5.31 CMD_BGCOLOR - set the background color 
 /*
- * Programming Guide section 5.31 CMD_BGCOLOR
- * set the background color 
+ * 5.11 CMD_DLSTART
+ * Start a new display list
+ */
+void ft81x_cmd_dlstart() {
+   ft81x_cFFFFFF(0x00);
+}
+
+/*
+ * 5.21 CMD_PLAYVIDEO
+ * Video playback
+ */
+void ft81x_cmd_playvideo(uint32_t options, uint8_t *data) {
+   ft81x_cFFFFFF(0x40);
+   //FIXME: stream video to FT81X
+}
+
+/*
+ * 5.22 CMD_VIDEOSTART
+ * Initialize the AVI video decoder
+ */
+void ft81x_cmd_videostart() {
+   ft81x_cFFFFFF(0x40);
+}
+
+/*
+ * 5.23 CMD_VIDEOFRAME
+ * Loads the next frame of video
+ */
+void ft81x_cmd_videoframe(uint32_t dst, uint32_t ptr) {
+   ft81x_cFFFFFF(0x40);
+   ft81x_cI(dst);
+   ft81x_cI(ptr);
+}
+
+
+/*
+ * 5.31 CMD_BGCOLOR
+ * Set the background color 
  */
 void ft81x_bgcolor_rgb32(uint32_t rgb) {
   ft81x_cFFFFFF(0x09);
@@ -862,50 +1040,7 @@ void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 /*
- * Programming Guide section 5.12 CMD_SWAP
- * Swap the current display list
- */
-void ft81x_cmd_swap() {
-   ft81x_cFFFFFF(0x01);
-}
-
-/*
- * Programming Guide section 4.29 DISPLAY
- * End the display list. FT81X will ignore all commands following this command.
- */
-void ft81x_display() {
-   ft81x_cI((0x0UL << 24));
-}
-
-/*
- * Programming Guide section 5.44 CMD_LOADIDENTITY
- * Set the current matrix to the identity matrix
- * 
- */
-void ft81x_cmd_loadidentity() {
-   ft81x_cFFFFFF(0x26);
-}
-
-/*
- * Programming Guide section 5.11 CMD_DLSTART
- * Start a new display list
- */
-void ft81x_cmd_dlstart() {
-   ft81x_cFFFFFF(0x00);
-}
-
-/*
- * Programming Guide section 5.11 CMD_SETROTATE
- * Start a new display list
- */
-void ft81x_cmd_setrotate(uint32_t r) {
-   ft81x_cFFFFFF(0x36);
-   ft81x_cI(r);
-   //FIXME: Update our own internal H/W to reflect display
-}
-
-/*
- * Programming Guide section 5.41 CMD_TEXT
+ * 5.41 CMD_TEXT
  * Draw text
  * FIXME: Needs padding to be 4 byte aligned
  */
@@ -922,7 +1057,7 @@ void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const 
 }
 
 /*
- * Programming Guide section 5.43 CMD_NUMBER
+ * 5.43 CMD_NUMBER
  * Draw number
  */
 void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int32_t n) {
@@ -938,76 +1073,234 @@ void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int3
 }
 
 /*
- * Programming Guide section 5.66 CMD_LOGO
+ * 5.44 CMD_LOADIDENTITY
+ * Set the current matrix to the identity matrix
+ */
+void ft81x_cmd_loadidentity() {
+   ft81x_cFFFFFF(0x26);
+}
+
+/* FIXME
+ * 5.48 CMD_GETPROPS
+ * Get the image properties decompressed by CMD_LOADIMAGE
+ */
+void ft81x_cmd_getprops(uint32_t *ptr, uint32_t *width, uint32_t *height) {
+  ft81x_cFFFFFF(0x25);
+  // FIXME get data out
+  // ft81x_cI(ptr);  
+  // ft81x_cI(width);
+  // ft81x_cI(height);
+}
+
+/*
+ * 5.49 CMD_SCALE
+ * Apply a scale to the current matrix
+ */
+void ft81x_cmd_scale(int32_t sx, int32_t sy) {
+  ft81x_cFFFFFF(0x28);
+  ft81x_cI(sx);
+  ft81x_cI(sy);
+}
+
+/*
+ * 5.50 CMD_ROTATE
+ * Apply a rotation to the current matrix
+ */
+void ft81x_cmd_rotate(int32_t a) {
+   ft81x_cFFFFFF(0x29);
+   ft81x_cI(a);
+}
+
+/*
+ * 5.51 CMD_TRANSLATE
+ * Apply a translation to the current matrix
+ */
+void ft81x_cmd_translate(int32_t tx, int32_t ty) {
+   ft81x_cFFFFFF(0x27);
+   ft81x_cI(tx);
+   ft81x_cI(tx);
+}
+
+/*
+ * 5.52 CMD_CALIBRATE
+ * Execute the touch screen calibration routine
+ */
+void ft81x_cmd_calibrate(uint32_t *result) {
+   ft81x_cFFFFFF(0x15);
+   // FIXME: blocking
+   // read back 32bits after READ=WRITE
+}
+
+/*
+ * 5.53 CMD_SETROTATE
+ * Rotate the screen
+ */
+void ft81x_cmd_setrotate(uint32_t r) {
+   ft81x_cFFFFFF(0x36);
+   ft81x_cI(r);
+   //FIXME: Update our own internal H/W to reflect display
+}
+
+/*
+ * 5.54 CMD_SPINNER
+ * Start an animated spinner
+ */
+void ft81x_cmd_spinner(int16_t x, int16_t y, int16_t style, int16_t scale) {
+  ft81x_cFFFFFF(0x16);
+  uint16_t b[4];
+  b[0] = x;
+  b[1] = y;
+  b[2] = style;
+  b[3] = scale;
+  ft81x_cN((uint8_t *)&b,sizeof(b));  
+}
+
+/*
+ * 5.55 CMD_SCREENSAVER
+ * Start an animated screensaver
+ */
+void ft81x_cmd_screensaver() {
+  ft81x_cFFFFFF(0x2f);
+}
+
+/*
+ * 5.56 CMD_SKETCH
+ * Start a continuous sketch update
+ */
+void ft81x_cmd_sketch(int16_t x, int16_t y, int16_t w, int16_t h, int16_t ptr, int16_t format) {
+  uint16_t b[6];
+  b[0] = x;
+  b[1] = y;
+  b[2] = w;
+  b[3] = h;
+  b[4] = ptr;
+  b[5] = format; // dummy pad
+
+  ft81x_cFFFFFF(0x30);
+  ft81x_cN((uint8_t *)&b,sizeof(b));
+}
+
+/*
+ * 5.57 CMD_STOP
+ * Stop any active spinner, screensaver or sketch
+ */
+void ft81x_cmd_stop() {
+  ft81x_cFFFFFF(0x17);
+}
+
+/*
+ * 5.58 CMD_SETFONT
+ * Set up a custom font
+ */
+void ft81x_cmd_setfont(uint32_t font, uint32_t ptr) {
+  ft81x_cFFFFFF(0x2b);
+  ft81x_cI(font);
+  ft81x_cI(ptr);
+}
+
+/*
+ * 5.59 CMD_SETFONT2
+ * Set up a custom font
+ */
+void ft81x_cmd_setfont2(uint32_t handle, uint32_t font, uint32_t ptr, uint32_t firstchar) {
+  ft81x_cFFFFFF(0x3b);
+  ft81x_cI(font);
+  ft81x_cI(ptr);
+  ft81x_cI(firstchar);
+}
+
+/*
+ * 5.60 CMD_SETSCRATCH
+ * Set the scratch bitmap for widget use
+ */
+void ft81x_cmd_setscratch(uint32_t handle) {
+  ft81x_cFFFFFF(0x3c);
+  ft81x_cI(handle);
+}
+
+/*
+ * 5.61 CMD_ROMFONT
+ * ROM font number, 16~34
+ */
+void ft81x_cmd_romfont(uint32_t font, uint32_t slot) {
+  ft81x_cFFFFFF(0x3f);
+  ft81x_cI(font);
+  ft81x_cI(slot);
+}
+
+
+/*
+ * 5.62 CMD_TRACK
+ * Track touches for a graphics object
+ */
+void ft81x_cmd_track(int16_t x, int16_t y, int16_t width, int16_t height, int16_t tag) {
+  uint16_t b[6];
+  b[0] = x;
+  b[1] = y;
+  b[2] = width;
+  b[3] = height;
+  b[4] = tag;
+  b[5] = 0; // dummy pad
+
+  ft81x_cFFFFFF(0x2c);
+  ft81x_cN((uint8_t *)&b,sizeof(b));
+}
+
+/*
+ * 5.63 CMD_SNAPSHOT
+ * Take a snapshot of the current screen
+ */
+void ft81x_cmd_snapshot(uint32_t ptr) {
+  ft81x_cFFFFFF(0x1f);
+  ft81x_cI(ptr);
+}
+
+/*
+ * 5.64 CMD_SNAPSHOT2
+ * Take a snapshot of the current screen
+ */
+void ft81x_cmd_snapshot2(uint32_t fmt, uint32_t ptr, uint16_t x, uint16_t y, uint16_t width, uint16_t height) {
+  uint16_t b[4];
+  b[0] = x;
+  b[1] = y;
+  b[2] = width;
+  b[3] = height;
+  
+  ft81x_cFFFFFF(0x37);
+  ft81x_cI(fmt);
+  ft81x_cI(ptr);
+  ft81x_cN((uint8_t *)&b,sizeof(b));
+}
+
+/*
+ * 5.65 CMD_SETBITMAP
+ * set up display list for bitmap
+ */
+void ft81x_cmd_setbitmap(uint32_t addr, uint16_t fmt, uint16_t width, uint16_t height) {
+  uint16_t b[4];
+  b[0] = fmt;
+  b[1] = width;
+  b[2] = height;
+  b[3] = 0;
+  
+  ft81x_cFFFFFF(0x43);
+  ft81x_cI(addr);
+  ft81x_cN((uint8_t *)&b,sizeof(b));
+}
+
+/*
+ * 5.66 CMD_LOGO
  * Play FTDI logo animation wait till it is done
  */
 void ft81x_logo() {
   ft81x_stream_start(); // Start streaming
   ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
   ft81x_cFFFFFF(0x31);  // Logo command
-  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+  ft81x_cmd_swap();     // Set AUTO swap at end of display list
   ft81x_getfree(0);     // trigger FT81x to read the command buffer
   ft81x_stream_stop();  // Finish streaming to command buffer
-  // Wait till the Logo is finished  
-  ft81x_wait_finish();  
+  // Wait till the Logo is finished
+  ft81x_wait_finish();
   // AFAIK the only command that will set the RD/WR to 0 when finished
   ft81x_reset_fifo();
-}
-
-/*
- * Programming Guide section 4.47 VERTEX2F
- * Start the operation of graphics primitives at the specified
- * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
- */
-void ft81x_vertex2f(int16_t x, int16_t y) {
-  ft81x_cI((1UL << 30) | ((x & 32767L) << 15) | ((y & 32767L) << 0));
-}
-
-/*
- * Programming Guide section 4.48 VERTEX2ii
- * Start the operation of graphics primitives at the specified
- * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
- */
-void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell) {
-  uint8_t b[4];
-  b[0] = (cell & 127) | ((handle & 1) << 7);
-  b[1] = (handle >> 1) | (y << 4);
-  b[2] = (y >> 4) | (x << 5);
-  b[3] = (2 << 6) | (x >> 3);
-  ft81x_cI(*((uint32_t *)&b[0]));
-}
- 
-/*
- * Programming Guide section 4.36 POINT_SIZE
- * Specify the radius of points
- */
-void ft81x_point_size(uint16_t size) {
-  ft81x_cI((0x0dUL << 24) | ((size & 8191L) << 0));
-}
-
-/*
- * Programming Guide section 4.5 BEGIN
- * Begin drawing a graphics primitive
- */
-void ft81x_begin( uint8_t prim) {
-  ft81x_cI((0x1fUL << 24) | prim);
-}
-
-/*
- * Programming Guide section 4.30 END
- * End drawing a graphics primitive
- */
-void ft81x_end() {
-  ft81x_cI((0x21UL << 24));
-}
-
-/*
- * Finish. Wait till READ and WRITE pointers are 0.
- * presumes not currently streaming commands
- */
-void ft81x_wait_finish() {
-  // Block until animation is done READ and WRITE will be 0  
-  while ( (ft81x_rd16(REG_CMD_WRITE) != 0) ||
-          (ft81x_rd16(REG_CMD_READ) != 0)
-        );  
 }
