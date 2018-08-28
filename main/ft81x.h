@@ -260,20 +260,62 @@ void ft81x_display();
 // 4.30 END - End drawing a graphics primitive
 void ft81x_end();
 
+// 4.31 JUMP - Execute commands at another location in the display list
+void ft81x_jump();
+
+// 4.32 LINE_WIDTH - Specify the width of lines to be drawn with primitive LINES in 1/16 pixel precision
+void ft81x_line_width(uint16_t width);
+
+// 4.33 MACRO - Execute a single command from a macro register
+void ft81x_macro(uint16_t m);
+
 // 4.34 NOP - No Operation
 void ft81x_nop();
+
+// 4.35 PALETTE_SOURCE - Specify the base address of the palette
+void ft81x_palette_source(uint32_t addr);
 
 // 4.36 POINT_SIZE - Specify the radius of points
 void ft81x_point_size(uint16_t size);
 
+// 4.37 RESTORE_CONTEXT - Restore the current graphics context from the context stack
+void ft81x_restore_context();
+
+// 4.38 RETURN - Return from a previous CALL command
+void ft81x_return();
+
+// 4.39 SAVE_CONTEXT - Push the current graphics context on the context stack
+void ft81x_save_context();
+
+// 4.40 SCISSOR_SIZE - Specify the size of the scissor clip rectangle
+void ft81x_scissor_size(uint16_t width, uint16_t height);
+
+// 4.41 SCISSOR_XY - Specify the top left corner of the scissor clip rectangle
+void ft81x_scissor_size(uint16_t x, uint16_t y);
+
+// 4.42 STENCIL_FUNC - Set function and reference value for stencil testing
+void ft81x_stencil_func(uint8_t func, uint8_t ref, uint8_t mask);
+
+// 4.43 STENCIL_MASK - Control the writing of individual bits in the stencil planes
+void ft81x_stencil_mask(uint8_t mask);
+
+// 4.44 STENCIL_OP - Set stencil test actions
+void ft81x_stencil_op(uint8_t sfail, uint8_t spass);
+
 // 4.45 TAG - Attach the tag value for the following graphics objects drawn on the screen. def. 0xff
 void ft81x_tag(uint8_t s);
+
+// 4.46 TAG_MASK - Control the writing of the tag buffer
+void ft81x_tag_mask(uint8_t mask);
 
 // 4.47 VERTEX2F - Start the operation of graphics primitives at the specified screen coordinate
 void ft81x_vertex2f(int16_t x, int16_t y);
 
 // 4.48 VERTEX2II - Start the operation of graphics primitives at the specified screen coordinate
 void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell);
+
+// 4.49 VERTEX_FORMAT - Set the precision of VERTEX2F coordinates
+void ft81x_vertex_format(int8_t frac);
 
 // 5.11 CMD_DLSTART - start a new display list
 void ft81x_cmd_dlstart();
@@ -298,14 +340,32 @@ void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 void ft81x_bgcolor_rgb32(uint32_t rgb);
 void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 
-// 5.41 CMD_TEXT - draw text
+// 5.39 CMD_DIAL - Draw a rotary dial control
+void ft81x_cmd_dial(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t val);
+
+// 5.40 CMD_TOGGLE - Draw a toggle switch
+void ft81x_cmd_toggle(int16_t x, int16_t y, int16_t w, int16_t font, uint16_t options, uint16_t state, const char* s);
+
+// 5.41 CMD_TEXT - Draw text
 void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const char *s);
 
-// 5.43 CMD_NUMBER - draw number
+// 5.42 CMD_SETBASE - Set the background color 
+void ft81x_cmd_setbase(uint32_t b);
+
+// 5.43 CMD_NUMBER - Draw number
 void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int32_t n);
 
 // 5.44 CMD_LOADIDENTITY - Set the current matrix to the identity matrix
 void ft81x_cmd_loadidentity();
+
+// 5.45 CMD_SETMATRIX FIXME - Write the current matrix to the display list
+void ft81x_cmd_setmatrix();
+  
+// 5.46 CMD_GETMATRIX FIXME - Retrieves the current matrix within the context of the co-processor engine
+void ft81x_cmd_getmatrix(int32_t *a, int32_t *b, int32_t *c, int32_t *d, int32_t *e, int32_t *f);
+  
+// 5.47 CMD_GETPTR FIXME - Get the end memory address of data inflated by CMD_INFLATE
+void ft81x_cmd_getptr(uint32_t *result);
 
 // 5.48 CMD_GETPROPS FIXME - Get the image properties decompressed by CMD_LOADIMAGE
 void ft81x_cmd_getprops(uint32_t *ptr, uint32_t *width, uint32_t *height);
@@ -319,10 +379,10 @@ void ft81x_cmd_rotate(int32_t a);
 // 5.51 CMD_TRANSLATE - Apply a translation to the current matrix
 void ft81x_cmd_translate(int32_t tx, int32_t ty);
 
-// 5.52 CMD_CALIBRATE - execute the touch screen calibration routine
+// 5.52 CMD_CALIBRATE - Execute the touch screen calibration routine
 void ft81x_cmd_calibrate(uint32_t *result);
 
-// 5.53 CMD_SETROTATE - rotate the screen
+// 5.53 CMD_SETROTATE - Rotate the screen
 void ft81x_cmd_setrotate(uint32_t r);
 
 // 5.54 CMD_SPINNER - Start an animated spinner
@@ -340,13 +400,13 @@ void ft81x_cmd_stop();
 // 5.58 CMD_SETFONT - Set up a custom font
 void ft81x_cmd_setfont(uint32_t font, uint32_t ptr);
 
-// 5.59 CMD_SETFONT2 - set up a custom font
+// 5.59 CMD_SETFONT2 - Set up a custom font
 void ft81x_cmd_setfont2(uint32_t handle, uint32_t font, uint32_t ptr, uint32_t firstchar);
 
 // 5.60 CMD_SETSCRATCH - Set the scratch bitmap for widget use
 void ft81x_cmd_setscratch(uint32_t handle);
   
-// 5.61 CMD_ROMFONT
+// 5.61 CMD_ROMFONT - Load a ROM font into bitmap handle
 void ft81x_cmd_romfont(uint32_t font, uint32_t slot);
 
 // 5.62 CMD_TRACK - Track touches for a graphics object
