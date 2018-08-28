@@ -224,11 +224,56 @@ void ft81x_BitmapHandle(uint8_t byte);
 // Series of commands to swap the display
 void ft81x_swap();
 
+// 4.4 ALPHA_FUNCT - Specify the alpha test function
+void ft81x_alpha_funct(uint8_t func, uint8_t ref);
+
 // 4.5 BEGIN - Begin drawing a graphics primitive
 void ft81x_begin( uint8_t prim);
 
 // 4.6 BEGIN_HANDLE - Specify the bitmap handle
 void ft81x_bitmap_handle(uint8_t handle);
+
+// 4.7 BITMAP_LAYOUT - Specify the source bitmap memory format and layout for the current handle
+void ft81x_bitmap_layout(uint8_t format, uint16_t linestride, uint16_t height);
+
+// 4.8 BITMAP_LAYOUT_H - Specify the 2 most significant bits of the source bitmap memory format and layout for the current handle
+void ft81x_bitmap_layout_h(uint8_t linestride, uint8_t height);
+
+// 4.9 BITMAP_SIZE - Specify the screen drawing of bitmaps for the current handle
+void ft81x_bitmap_size(uint8_t filter, uint8_t wrapx, uint8_t wrapy, uint16_t width, uint16_t height);
+
+// 4.10 BITMAP_SIZE_H - Specify the source address of bitmap data in FT81X graphics memory RAM_G
+void ft81x_bitmap_size_h(uint8_t width, uint8_t height);
+
+// 4.11 BITMAP_SOURCE - Specify the source address of bitmap data in FT81X graphics memory RAM_G
+void ft81x_bitmap_source(uint32_t addr);
+
+// 4.12 BITMAP_TRANSFORM_A - Specify the A coefficient of the bitmap transform matrix
+void ft81x_bitmap_transform_a(uint32_t a);
+
+// 4.13 BITMAP_TRANSFORM_B - Specify the B coefficient of the bitmap transform matrix
+void ft81x_bitmap_transform_b(uint32_t b);
+
+// 4.14 BITMAP_TRANSFORM_C - Specify the C coefficient of the bitmap transform matrix
+void ft81x_bitmap_transform_c(uint32_t c);
+
+// 4.15 BITMAP_TRANSFORM_D - Specify the D coefficient of the bitmap transform matrix
+void ft81x_bitmap_transform_d(uint32_t d);
+
+// 4.16 BITMAP_TRANSFORM_E - Specify the E coefficient of the bitmap transform matrix
+void ft81x_bitmap_transform_e(uint32_t e);
+
+// 4.17 BITMAP_TRANSFORM_F - Specify the F coefficient of the bitmap transform matrix
+void ft81x_bitmap_transform_f(uint32_t f);
+
+// 4.18 BLEND_FUNC - Specify pixel arithmetic
+void ft81x_blend_func(uint8_t src, uint8_t dst);
+
+// 4.19 CALL - Execute a sequence of commands at another location in the display list
+void ft81x_call(uint16_t dest);
+
+// 4.20 CELL - Specify the bitmap cell number for the VERTEX2F command
+void ft81x_cell(uint8_t cell);
 
 // 4.21 CLEAR - Clears buffers to preset values
 void ft81x_clear();
@@ -267,7 +312,7 @@ void ft81x_jump();
 void ft81x_line_width(uint16_t width);
 
 // 4.33 MACRO - Execute a single command from a macro register
-void ft81x_macro(uint16_t m);
+void ft81x_macro(uint8_t m);
 
 // 4.34 NOP - No Operation
 void ft81x_nop();
@@ -291,7 +336,7 @@ void ft81x_save_context();
 void ft81x_scissor_size(uint16_t width, uint16_t height);
 
 // 4.41 SCISSOR_XY - Specify the top left corner of the scissor clip rectangle
-void ft81x_scissor_size(uint16_t x, uint16_t y);
+void ft81x_scissor_xy(uint16_t x, uint16_t y);
 
 // 4.42 STENCIL_FUNC - Set function and reference value for stencil testing
 void ft81x_stencil_func(uint8_t func, uint8_t ref, uint8_t mask);
@@ -316,6 +361,12 @@ void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell);
 
 // 4.49 VERTEX_FORMAT - Set the precision of VERTEX2F coordinates
 void ft81x_vertex_format(int8_t frac);
+
+// 4.50 VERTEX_TRANSLATE_X - Specify the vertex transformation’s X translation component
+void ft81x_vertex_translate_x(uint32_t x);
+
+// 4.51 VERTEX_TRANSLATE_Y - Specify the vertex transformation’s Y translation component
+void ft81x_vertex_translate_y(uint32_t y);
 
 // 5.11 CMD_DLSTART - start a new display list
 void ft81x_cmd_dlstart();

@@ -814,11 +814,19 @@ void ft81x_swap() {
  *
  */
 
+ /*
+  * 4.4 ALPHA_FUNCT
+  * Specify the alpha test function
+  */
+ void ft81x_alpha_funct(uint8_t func, uint8_t ref) {
+   ft81x_cI((0x9UL << 24) | ((func & 0x7L) << 8) | ((ref & 0xffL) << 0));   
+ }
+
 /*
  * 4.5 BEGIN
  * Begin drawing a graphics primitive
  */
-void ft81x_begin( uint8_t prim) {
+void ft81x_begin(uint8_t prim) {
   ft81x_cI((0x1fUL << 24) | prim);
 }
 
@@ -828,6 +836,132 @@ void ft81x_begin( uint8_t prim) {
  */
 void ft81x_bitmap_handle(uint8_t handle) {
   ft81x_cI((0x05UL << 24) | handle);
+}
+
+/*
+ * 4.7 BITMAP_LAYOUT
+ * Specify the source bitmap memory format and layout for the current handle
+ */
+void ft81x_bitmap_layout(uint8_t format, uint16_t linestride, uint16_t height) {
+  ft81x_cI((0x28UL << 24) | (((linestride) & 0x3) << 2) | (((height) & 0x3) << 0));
+  uint32_t msg = 0x07L; msg <<=8;
+  msg |= format & 0x1f; msg <<=5;
+  msg |= linestride & 0x3f; msg <<=10;
+  msg |= height & 0x3f;
+  ft81x_cI(msg);
+  
+}
+
+/*
+ * 4.8 BITMAP_LAYOUT_H
+ * Specify the 2 most significant bits of the source bitmap memory format and layout for the current handle
+ */
+void ft81x_bitmap_layout_h(uint8_t linestride, uint8_t height) {
+  ft81x_cI((0x28UL << 24) | (((linestride) & 0x3) << 2) | (((height) & 0x3) << 0));
+}
+
+/*
+ * 4.9 BITMAP_SIZE
+ * Specify the screen drawing of bitmaps for the current handle
+ */
+void ft81x_bitmap_size(uint8_t filter, uint8_t wrapx, uint8_t wrapy, uint16_t width, uint16_t height) {
+  uint32_t msg = 0x08L; msg <<=11;
+  msg |= filter & 0x01; msg <<=1;
+  msg |= wrapx & 0x01; msg <<=1;
+  msg |= wrapy & 0x01; msg <<=1;
+  msg |= width & 0x1f; msg <<=9;
+  msg |= height & 0x1f;
+  ft81x_cI(msg);
+}
+
+/*
+ * 4.10 BITMAP_SIZE_H
+ * Specify the source address of bitmap data in FT81X graphics memory RAM_G
+ */
+void ft81x_bitmap_size_h(uint8_t width, uint8_t height) {
+  ft81x_cI((0x29UL << 24) | (((width) & 0x3) << 2) | (((height) & 0x3) << 0));
+}
+
+/*
+ * 4.11 BITMAP_SOURCE
+ * Specify the source address of bitmap data in FT81X graphics memory RAM_G
+ */
+void ft81x_bitmap_source(uint32_t addr) {
+  ft81x_cI((0x01UL << 24) | ((addr & 0x3fffffL) << 0));
+}
+
+/*
+ * 4.12 BITMAP_TRANSFORM_A
+ * Specify the A coefficient of the bitmap transform matrix
+ */
+void ft81x_bitmap_transform_a(uint32_t a) {
+  ft81x_cI((0x15UL << 24) | ((a & 0xffffL) << 0));
+}
+
+/*
+ * 4.13 BITMAP_TRANSFORM_B
+ * Specify the B coefficient of the bitmap transform matrix
+ */
+void ft81x_bitmap_transform_b(uint32_t b) {
+  ft81x_cI((0x16UL << 24) | ((b & 0xffffL) << 0));
+}
+
+/*
+ * 4.14 BITMAP_TRANSFORM_C
+ * Specify the C coefficient of the bitmap transform matrix
+ */
+void ft81x_bitmap_transform_c(uint32_t c) {
+  ft81x_cI((0x17UL << 24) | ((c & 0xffffffL) << 0));
+}
+
+/*
+ * 4.15 BITMAP_TRANSFORM_D
+ * Specify the D coefficient of the bitmap transform matrix
+ */
+void ft81x_bitmap_transform_d(uint32_t d) {
+  ft81x_cI((0x18UL << 24) | ((d & 0xffffL) << 0));
+}
+
+/*
+ * 4.16 BITMAP_TRANSFORM_E
+ * Specify the E coefficient of the bitmap transform matrix
+ */
+void ft81x_bitmap_transform_e(uint32_t e) {
+  ft81x_cI((0x19UL << 24) | ((e & 0xffffL) << 0));
+}
+
+/*
+ * 4.17 BITMAP_TRANSFORM_F
+ * Specify the F coefficient of the bitmap transform matrix
+ */
+void ft81x_bitmap_transform_f(uint32_t f) {
+  ft81x_cI((0x1aUL << 24) | ((f & 0xffffffL) << 0));
+}
+
+/*
+ * 4.18 BLEND_FUNC
+ * Specify pixel arithmetic
+ */
+void ft81x_blend_func(uint8_t src, uint8_t dst) {
+  ft81x_cI((0x0bUL << 24) | ((src & 0x7L) << 3) | ((dst & 0x7L) << 0));
+}
+
+void ft81x_blend_func(uint8_t src, uint8_t dst);
+
+/*
+ * 4.19 CALL
+ * Execute a sequence of commands at another location in the display list
+ */
+void ft81x_call(uint16_t dest) {
+  ft81x_cI((0x1dUL << 24) | ((dest & 0x7fffL) << 0));
+}
+
+/*
+ * 4.20 CELL
+ * Specify the bitmap cell number for the VERTEX2F command
+ */
+void ft81x_cell(uint8_t cell) {
+  ft81x_cI((0x06UL << 24) | ((cell & 0x7fL) << 0));
 }
 
 /*
@@ -1007,7 +1141,7 @@ void ft81x_scissor_size(uint16_t width, uint16_t height) {
  * 4.41 SCISSOR_XY
  * Specify the top left corner of the scissor clip rectangle
  */
-void ft81x_scissor_size(uint16_t x, uint16_t y) {
+void ft81x_scissor_xy(uint16_t x, uint16_t y) {
   ft81x_cI((0x1bUL << 24) | ((x & 0x7ffL) << 11) | ((y & 0x7ffL) << 0));
 }
 
@@ -1024,7 +1158,7 @@ void ft81x_stencil_func(uint8_t func, uint8_t ref, uint8_t mask) {
  * Control the writing of individual bits in the stencil planes
  */
 void ft81x_stencil_mask(uint8_t mask) {
-  cI((0x13UL << 24) | ((sfail & 0x7L) << 3) | ((spass & 0x7L) << 0));
+  ft81x_cI((0x013UL << 24) | ((mask & 0xffL) << 0));
 }
 
 /*
@@ -1081,6 +1215,22 @@ void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell) {
  */
 void ft81x_vertex_format(int8_t frac) {
   ft81x_cI((0x27UL << 24) | (((frac) & 0x7) << 0));
+}
+
+/*
+ * 4.50 VERTEX_TRANSLATE_X
+ * Specify the vertex transformation’s X translation component
+ */
+void ft81x_vertex_translate_x(uint32_t x) {
+  ft81x_cI((0x2bUL << 24) | (((x) & 0x1ffffUL) << 0));
+}
+
+/*
+ * 4.51 VERTEX_TRANSLATE_Y
+ * Specify the vertex transformation’s Y translation component
+ */
+void ft81x_vertex_translate_y(uint32_t y) {
+  ft81x_cI((0x2cUL << 24) | (((y) & 0x1ffffUL) << 0));
 }
 
 /*
