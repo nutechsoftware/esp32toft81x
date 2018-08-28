@@ -896,15 +896,6 @@ void ft81x_color_mask(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
 }
 
 /*
- * 4.47 VERTEX2F
- * Start the operation of graphics primitives at the specified
- * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
- */
-void ft81x_vertex2f(int16_t x, int16_t y) {
-  ft81x_cI((0x1UL << 30) | ((x & 32767L) << 15) | ((y & 32767L) << 0));
-}
-
-/*
  * 4.28 COLOR_RGB
  * Set the current color red, green, blue
  */
@@ -933,6 +924,30 @@ void ft81x_end() {
 }
 
 /*
+ * 4.31 JUMP
+ * Execute commands at another location in the display list
+ */
+void ft81x_jump() {
+  ft81x_cI((0x1eUL << 24));
+}
+
+/*
+ * 4.32 LINE_WIDTH
+ * Specify the width of lines to be drawn with primitive LINES in 1/16 pixel precision
+ */
+void ft81x_line_width(uint16_t width) {
+  ft81x_cI((0x0eUL << 24) | (width & 0xfff));
+}
+
+/*
+ * 4.33 MACRO
+ * Execute a single command from a macro register
+ */
+void ft81x_macro(uint8_t macro) {
+  ft81x_cI((0x25UL << 24) | (macro & 1L));
+}
+
+/*
  * 4.34 NOP
  * No Operation
  */
@@ -941,11 +956,83 @@ void ft81x_nop() {
 }
 
 /*
-* 4.36 POINT_SIZE
-* Specify the radius of points
-*/
+ * 4.35 PALETTE_SOURCE
+ * Specify the base address of the palette
+ */
+void ft81x_palette_source(uint32_t addr) {
+  ft81x_cI((0x2aUL << 24) | ((addr) & 0x3fffffUL));
+}
+
+/*
+ * 4.36 POINT_SIZE
+ * Specify the radius of points
+ */
 void ft81x_point_size(uint16_t size) {
- ft81x_cI((0x0dUL << 24) | ((size & 8191L) << 0));
+ ft81x_cI((0x0dUL << 24) | ((size & 0x1fffL) << 0));
+}
+
+/*
+ * 4.37 RESTORE_CONTEXT
+ * Restore the current graphics context from the context stack
+ */
+void ft81x_restore_context() {
+  ft81x_cI((0x23UL << 24));
+}
+
+/*
+ * 4.38 RETURN
+ * Return from a previous CALL command
+ */
+void ft81x_return() {
+  ft81x_cI((0x24UL << 24));
+}
+
+/*
+ * 4.39 SAVE_CONTEXT
+ * Push the current graphics context on the context stack
+ */
+void ft81x_save_context() {
+  ft81x_cI((0x22UL << 24));
+}
+
+/*
+ * 4.40 SCISSOR_SIZE
+ * Specify the size of the scissor clip rectangle
+ */
+void ft81x_scissor_size(uint16_t width, uint16_t height) {
+  ft81x_cI((0x1cUL << 24) | ((width & 0xfffL) << 12) | ((height & 0xfffL) << 0));
+}
+
+/*
+ * 4.41 SCISSOR_XY
+ * Specify the top left corner of the scissor clip rectangle
+ */
+void ft81x_scissor_size(uint16_t x, uint16_t y) {
+  ft81x_cI((0x1bUL << 24) | ((x & 0x7ffL) << 11) | ((y & 0x7ffL) << 0));
+}
+
+/*
+ * 4.42 STENCIL_FUNC
+ * Set function and reference value for stencil testing
+ */
+void ft81x_stencil_func(uint8_t func, uint8_t ref, uint8_t mask) {
+  ft81x_cI((0x0aUL << 24) | ((func & 0x7L) << 16) | ((ref & 0xffL) << 8) | ((mask & 0xffL) << 0));
+}
+
+/*
+ * 4.43 STENCIL_MASK
+ * Control the writing of individual bits in the stencil planes
+ */
+void ft81x_stencil_mask(uint8_t mask) {
+  cI((0x13UL << 24) | ((sfail & 0x7L) << 3) | ((spass & 0x7L) << 0));
+}
+
+/*
+ * 4.44 STENCIL_OP
+ * Set stencil test actions
+ */
+void ft81x_stencil_op(uint8_t sfail, uint8_t spass) {
+  ft81x_cI((0x0cUL << 24) | ((sfail &0x7L) << 3) | ((spass & 0x7L) << 0));
 }
 
 /*
@@ -955,6 +1042,23 @@ void ft81x_point_size(uint16_t size) {
  */
 void ft81x_tag(uint8_t s) {
    ft81x_cI((0x3UL << 24) | ((s & 255L) << 0));
+}
+
+/*
+ * 4.46 TAG_MASK
+ * Control the writing of the tag buffer
+ */
+void ft81x_tag_mask(uint8_t mask) {
+   ft81x_cI((0x14UL << 24) | ((mask & 1L) << 0));
+}
+
+/*
+ * 4.47 VERTEX2F
+ * Start the operation of graphics primitives at the specified
+ * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
+ */
+void ft81x_vertex2f(int16_t x, int16_t y) {
+  ft81x_cI((0x1UL << 30) | ((x & 32767L) << 15) | ((y & 32767L) << 0));
 }
 
 /*
@@ -969,6 +1073,14 @@ void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell) {
   b[2] = (y >> 4) | (x << 5);
   b[3] = (2 << 6) | (x >> 3);
   ft81x_cI(*((uint32_t *)&b[0]));
+}
+
+/*
+ * 4.49 VERTEX_FORMAT
+ * Set the precision of VERTEX2F coordinates
+ */
+void ft81x_vertex_format(int8_t frac) {
+  ft81x_cI((0x27UL << 24) | (((frac) & 0x7) << 0));
 }
 
 /*
@@ -1040,6 +1152,41 @@ void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 /*
+ * 5.39 CMD_DIAL
+ * Draw a rotary dial control
+ */
+void ft81x_cmd_dial(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t val) {
+   ft81x_cFFFFFF(0x2d);
+   uint16_t b[6];
+   b[0] = x;
+   b[1] = y;
+   b[2] = r;
+   b[3] = options;
+   b[4] = val;
+   b[5] = 0; // dummy pad
+   ft81x_cN((uint8_t *)b,sizeof(b));
+}
+
+/*
+ * 5.40 CMD_TOGGLE
+ * Draw a toggle switch
+ * FIXME: Needs padding to be 4 byte aligned
+ */
+void ft81x_cmd_toggle(int16_t x, int16_t y, int16_t w, int16_t font, uint16_t options, uint16_t state, const char* s) {
+   ft81x_cFFFFFF(0x0c);
+   uint16_t b[6];
+   b[0] = x;
+   b[1] = y;
+   b[2] = w;
+   b[3] = font;
+   b[4] = options;
+   b[5] = state;   
+   ft81x_cN((uint8_t *)b,sizeof(b));
+   ft81x_cN((uint8_t *)s,strlen(s)+1);
+   ESP_LOGW(TAG, "FIXME PADDING: 0x%04x", strlen(s)+1);
+}
+
+/*
  * 5.41 CMD_TEXT
  * Draw text
  * FIXME: Needs padding to be 4 byte aligned
@@ -1054,6 +1201,15 @@ void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const 
    ft81x_cN((uint8_t *)b,sizeof(b));
    ft81x_cN((uint8_t *)s,strlen(s)+1);
    ESP_LOGW(TAG, "FIXME PADDING: 0x%04x", strlen(s)+1);
+}
+
+/*
+ * 5.42 CMD_SETBASE
+ * Set the background color 
+ */
+void ft81x_cmd_setbase(uint32_t b) {
+  ft81x_cFFFFFF(0x38);
+  ft81x_cI(b);
 }
 
 /*
@@ -1080,6 +1236,39 @@ void ft81x_cmd_loadidentity() {
    ft81x_cFFFFFF(0x26);
 }
 
+/*
+ * 5.46 CMD_SETMATRIX
+ * Write the current matrix to the display list
+ */
+void ft81x_cmd_setmatrix() {
+   ft81x_cFFFFFF(0x2a);
+}
+
+/* FIXME
+ * 5.46 CMD_GETMATRIX
+ * Retrieves the current matrix within the context of the co-processor engine
+ */
+void ft81x_cmd_getmatrix(int32_t *a, int32_t *b, int32_t *c, int32_t *d, int32_t *e, int32_t *f) {
+  ft81x_cFFFFFF(0x33);
+  // FIXME get data out
+  // ft81x_rd32(a);
+  // ft81x_rd32(b);
+  // ft81x_rd32(c);
+  // ft81x_rd32(d);
+  // ft81x_rd32(e);
+  // ft81x_rd32(f);  
+}
+
+/* FIXME
+ * 5.47 CMD_GETPTR
+ * Get the end memory address of data inflated by CMD_INFLATE
+ */
+void ft81x_cmd_getptr(uint32_t *result) {
+  ft81x_cFFFFFF(0x23);
+  // FIXME get data out
+  // ft81x_rd32(result);
+}
+
 /* FIXME
  * 5.48 CMD_GETPROPS
  * Get the image properties decompressed by CMD_LOADIMAGE
@@ -1087,9 +1276,9 @@ void ft81x_cmd_loadidentity() {
 void ft81x_cmd_getprops(uint32_t *ptr, uint32_t *width, uint32_t *height) {
   ft81x_cFFFFFF(0x25);
   // FIXME get data out
-  // ft81x_cI(ptr);  
-  // ft81x_cI(width);
-  // ft81x_cI(height);
+  // ft81x_rd32(ptr);  
+  // ft81x_rd32(width);
+  // ft81x_rd32(height);
 }
 
 /*
@@ -1220,7 +1409,7 @@ void ft81x_cmd_setscratch(uint32_t handle) {
 
 /*
  * 5.61 CMD_ROMFONT
- * ROM font number, 16~34
+ * Load a ROM font into bitmap handle
  */
 void ft81x_cmd_romfont(uint32_t font, uint32_t slot) {
   ft81x_cFFFFFF(0x3f);
@@ -1274,7 +1463,7 @@ void ft81x_cmd_snapshot2(uint32_t fmt, uint32_t ptr, uint16_t x, uint16_t y, uin
 
 /*
  * 5.65 CMD_SETBITMAP
- * set up display list for bitmap
+ * Set up display list for bitmap
  */
 void ft81x_cmd_setbitmap(uint32_t addr, uint16_t fmt, uint16_t width, uint16_t height) {
   uint16_t b[4];
