@@ -42,47 +42,96 @@
 
 //// QUAD SPI is not stable yet. Noise or ...?
 //// Enable QUAD spi mode on ESP32 and FT81X
-#define FT81X_QUADSPI 0
+#define FT81X_QUADSPI         0
 
 #define SPI_SHIFT_DATA(data, len) __builtin_bswap32((uint32_t)data<<(32-len))
 #define SPI_REARRANGE_DATA(data, len) (__builtin_bswap32(data)>>(32-len))
-#define WRITE_OP 1
-#define READ_OP 0
-#define ORIENTATION 0
-
-// OPTIONS
-#define OPT_3D            0
-#define OPT_RGB565        0
-#define OPT_MONO          1
-#define OPT_NODL          2
-#define OPT_FLAT        256
-#define OPT_SIGNED      256
-#define OPT_CENTERX     512
-#define OPT_CENTERY    1024
-#define OPT_CENTER     1536
-#define OPT_RIGHTX     2048
-#define OPT_NOBACK     4096
-#define OPT_NOTICKS    8192
-#define OPT_NOHM      16384
-#define OPT_NOPOINTER 16384
-#define OPT_NOSECS    32768
-#define OPT_NOHANDS   49152
-#define OPT_NOTEAR        4
-#define OPT_FULLSCREEN    8
-#define OPT_MEDIAFIFO    16
-#define OPT_SOUND        32
+#define WRITE_OP              1
+#define READ_OP               0
+#define ORIENTATION           0
 
 // Table 6 FT81X graphics primitive operation definition
-#define BITMAPS           1
-#define POINTS            2
-#define LINES             3
-#define LINE_STRIP        4
-#define EDGE_STRIP_R      5
-#define EDGE_STRIP_L      6
-#define EDGE_STRIP_A      7
-#define EDGE_STRIP_B      8
-#define RECTS             9
+#define BITMAPS               1
+#define POINTS                2
+#define LINES                 3
+#define LINE_STRIP            4
+#define EDGE_STRIP_R          5
+#define EDGE_STRIP_L          6
+#define EDGE_STRIP_A          7
+#define EDGE_STRIP_B          8
+#define RECTS                 9
 
+// Table 7 BITMAP_LAYOUT format list 
+#define ARGB1555              0
+#define L1                    1
+#define L4                    2
+#define L8                    3
+#define RGB332                4
+#define ARGB2                 5
+#define ARGB4                 6
+#define RGB565                7
+#define PALETTED              8
+#define TEXT8X8               9
+#define TEXTVGA              10
+#define BARGRAPH             11
+#define PALETTED565          14
+#define PALETTED4444         15
+#define PALETTED8            16
+#define L2                   17
+
+
+#define NEAREST              0
+#define BILINEAR             1
+#define BORDER               0
+#define REPEAT               1
+
+// Table 8 BLEND_FUNC constant value definition
+#define ZERO                  0
+#define ONE                   1
+#define SRC_ALPHA             2
+#define DST_ALPHA             3
+#define ONE_MINUS_SRC_ALPHA   4
+#define ONE_MINUS_DST_ALPHA   5
+
+// Table 13 FT81X OPTIONS
+#define OPT_3D                0
+#define OPT_RGB565            0
+#define OPT_MONO              1
+#define OPT_NODL              2
+#define OPT_FLAT            256
+#define OPT_SIGNED          256
+#define OPT_CENTERX         512
+#define OPT_CENTERY        1024
+#define OPT_CENTER         1536
+#define OPT_RIGHTX         2048
+#define OPT_NOBACK         4096
+#define OPT_NOTICKS        8192
+#define OPT_NOHM          16384
+#define OPT_NOPOINTER     16384
+#define OPT_NOSECS        32768
+#define OPT_NOHANDS       49152
+#define OPT_NOTEAR            4
+#define OPT_FULLSCREEN        8
+#define OPT_MEDIAFIFO        16
+#define OPT_SOUND            32
+
+// Figure 5 FT81X The constants of ALPHA_FUNC
+#define NEVER                 0
+#define LESS                  1
+#define LEQUAL                2
+#define GREATER               3
+#define GEQUAL                4
+#define EQUAL                 5
+#define NOTEQUAL              6
+#define ALWAYS                7
+
+// Figure 10 FT81X STENCIL_OP constants definition
+#define ZERO                  0
+#define KEEP                  1
+#define REPLACE               2
+#define INCR                  3
+#define DECR                  4
+#define INVERT                5
 
 // MEMORY MAP DEFINES
 #define RAM_G          0x000000UL // General purpose graphics RAM
@@ -136,18 +185,18 @@
 #define REG_SPI_WIDTH  0x302188UL //  3RW QSPI bus width and dummy cycle setting
 
 // COMMANDS 
-#define CMD_ACTIVE     0x00       // Switch from standby/sleep/pwrdown to active mode
-#define CMD_STANDBY    0x41       // Put FT81X into standby mode
-#define CMD_SLEEP      0x42       // Put FT81X core to sleep mode
-#define CMD_PWRDOWN    0x43       // Switch off 1.2v core voltage. SPI still on.
-#define CMD_PD_ROMS    0x49       // Select power down individual ROMs.
-#define CMD_CLKEXT     0x44       // Select PLL input from external osc.
-#define CMD_CLKINT     0x48       // Select PLL input from internal osc.
-#define CMD_CLKSEL_A   0x61       // Set clock in sleep mode. TODO: why 2?
-#define CMD_CLKSEL_B   0x62       // ""
-#define CMD_RST_PULSE  0x68       // Send reset pulse to FT81x core.
-#define CMD_PINDRIVE   0x70       // Pin driver power levels
-#define PIN_PD_STATE   0x71       // Pin state when powered down Float/Pull-Down
+#define CMD_ACTIVE         0x00   // Switch from standby/sleep/pwrdown to active mode
+#define CMD_STANDBY        0x41   // Put FT81X into standby mode
+#define CMD_SLEEP          0x42   // Put FT81X core to sleep mode
+#define CMD_PWRDOWN        0x43   // Switch off 1.2v core voltage. SPI still on.
+#define CMD_PD_ROMS        0x49   // Select power down individual ROMs.
+#define CMD_CLKEXT         0x44   // Select PLL input from external osc.
+#define CMD_CLKINT         0x48   // Select PLL input from internal osc.
+#define CMD_CLKSEL_A       0x61   // Set clock in sleep mode. TODO: why 2?
+#define CMD_CLKSEL_B       0x62   // ""
+#define CMD_RST_PULSE      0x68   // Send reset pulse to FT81x core.
+#define CMD_PINDRIVE       0x70   // Pin driver power levels
+#define PIN_PD_STATE       0x71   // Pin state when powered down Float/Pull-Down
 
 /*
  * Types
@@ -166,17 +215,23 @@ bool ft81x_initGPU();
 // reset the fifo state vars
 void ft81x_reset_fifo();
 
+// Get our current fifo write state location
+uint32_t ft81x_getwp();
+
 // Wrapper for CS to allow easier debugging
 void ft81x_cs(uint8_t n);
 
 // Send a Host Command to the FT81X chip see 4.1.5 Host Command
 void ft81x_hostcmd(uint8_t command, uint8_t args);
 
-// Send a 16 bit address + dummy and read by the 8 bit response
+// Send a 16 bit address + dummy and read the 8 bit response
 uint8_t ft81x_rd(uint32_t addr);
 
-// Send a 16 bit address + dummy and read by the 16 bit response
+// Send a 16 bit address + dummy and read the 16 bit response
 uint16_t ft81x_rd16(uint32_t addr);
+
+// Send a 16 bit address + dummy and read the 32 bit response
+uint32_t ft81x_rd32(uint32_t addr);
 
 // Send a 16 bit address and write 8 bits of data
 void ft81x_wr(uint32_t addr, uint8_t byte);
@@ -189,6 +244,9 @@ void ft81x_wr32(uint32_t addr, uint32_t word);
 
 // Read the FT81x command pointer
 uint16_t ft81x_rp();
+
+// Write out padded bits to be sure we are 32 bit aligned as required by the FT81X
+void ft81x_align(uint32_t written);
 
 // Set the address and write mode pointer to the command buffer
 // leaving the CS line enabled for further data
@@ -217,6 +275,9 @@ void ft81x_cmd32(uint32_t word);
 
 // While in stream() mode send a char buffer into the command buffer.
 void ft81x_cN(uint8_t *buffer, uint16_t size);
+
+// Spool a large block of memory in chunks into the FT81X in 1k chunks
+void ft81x_cSPOOL(uint8_t *buffer, int32_t size);
 
 // While in stream() mode send out a bitmap handle command into the command fifo
 void ft81x_BitmapHandle(uint8_t byte);
@@ -279,6 +340,9 @@ void ft81x_cell(uint8_t cell);
 void ft81x_clear();
 void ft81x_clearCST(uint8_t color, uint8_t stencil, uint8_t tag);
 
+// 4.21 CLEAR_COLOR_A - Specify clear value for the alpha channel
+void ft81x_clear_color_a(uint8_t alpha);
+
 // 4.23 CLEAR_COLOR_RGB - Specify clear values for red,green and blue channels
 void ft81x_clear_color_rgb32(uint32_t rgb);
 void ft81x_clear_color_rgb888(uint8_t red, uint8_t green, uint8_t blue);
@@ -306,7 +370,7 @@ void ft81x_display();
 void ft81x_end();
 
 // 4.31 JUMP - Execute commands at another location in the display list
-void ft81x_jump();
+void ft81x_jump(uint16_t dest);
 
 // 4.32 LINE_WIDTH - Specify the width of lines to be drawn with primitive LINES in 1/16 pixel precision
 void ft81x_line_width(uint16_t width);
@@ -368,20 +432,59 @@ void ft81x_vertex_translate_x(uint32_t x);
 // 4.51 VERTEX_TRANSLATE_Y - Specify the vertex transformation’s Y translation component
 void ft81x_vertex_translate_y(uint32_t y);
 
-// 5.11 CMD_DLSTART - start a new display list
+// 5.11 CMD_DLSTART - Start a new display list
 void ft81x_cmd_dlstart();
 
-// 5.12 CMD_SWAP - swap the current display list
+// 5.12 CMD_SWAP - Swap the current display list
 void ft81x_cmd_swap();
 
-//5.21 CMD_PLAYVIDEO - Video playback
+// 5.13 CMD_COLDSTART - This command sets the co-processor engine to default reset states
+void ft81x_cmd_coldstart();
+
+// 5.14 CMD_INTERRUPT - trigger interrupt INT_CMDFLAG
+void ft81x_cmd_interrupt(uint32_t ms);
+
+// 5.15 CMD_APPEND - Append more commands to current display list
+void ft81x_cmd_append(uint32_t ptr, uint32_t num);
+
+// 5.16 CMD_REGREAD - Read a register value
+void ft81x_cmd_regread(uint32_t ptr, uint32_t *result);
+
+// 5.17 CMD_MEMWRITE - Write bytes into memory
+void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num, void *mem);
+
+// 5.18 CMD_INFLATE - Decompress data into memory
+void ft81x_cmd_inflate(uint32_t ptr);
+
+// 5.19 CMD_LOADIMAGE - Load a JPEG or PNG image
+void ft81x_cmd_loadimage(uint32_t ptr, uint32_t options);
+
+// 5.20 CMD_MEDIAFIFO - set up a streaming media FIFO in RAM_G
+void ft81x_cmd_mediafifo(uint32_t ptr, uint32_t size);
+
+// 5.21 CMD_PLAYVIDEO - Video playback
 void ft81x_cmd_playvideo(uint32_t options, uint8_t *data);
 
 // 5.22 CMD_VIDEOSTART - Initialize the AVI video decoder
 void ft81x_cmd_videostart();
 
-// 5.23 CMD_VIDEOFRAME
+// 5.23 CMD_VIDEOFRAME - Load the next frame of video
 void ft81x_cmd_videoframe(uint32_t dst, uint32_t ptr);
+
+// 5.24 CMD_MEMCRC - Compute a CRC-32 for memory
+uint32_t ft81x_cmd_memcrc(uint32_t ptr, uint32_t num);
+
+// 5.25 CMD_MEMZERO - Write zero to a block of memory 
+void ft81x_cmd_memzero(uint32_t ptr, uint32_t num);
+
+// 5.26 CMD_MEMSET - Fill memory with a byte value
+void ft81x_cmd_memset(uint32_t ptr, uint32_t value, uint32_t num);
+
+// 5.27 CMD_MEMCPY - Copy a block of memory
+void ft81x_cmd_memcpy(uint32_t dest, uint32_t src, uint32_t num);
+
+// 5.28 CMD_BUTTON - Draw a button
+void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t font, uint16_t options, const char* s);
 
 // 5.30 CMD_FGCOLOR - set the foreground color 
 void ft81x_fgcolor_rgb32(uint32_t rgb);
@@ -432,6 +535,7 @@ void ft81x_cmd_translate(int32_t tx, int32_t ty);
 
 // 5.52 CMD_CALIBRATE - Execute the touch screen calibration routine
 void ft81x_cmd_calibrate(uint32_t *result);
+void ft81x_calibrate();
 
 // 5.53 CMD_SETROTATE - Rotate the screen
 void ft81x_cmd_setrotate(uint32_t r);
@@ -475,7 +579,7 @@ void ft81x_cmd_setbitmap(uint32_t addr, uint16_t fmt, uint16_t width, uint16_t h
 // 5.66 CMD_LOGO - play FTDI logo animation
 void ft81x_logo();
 
-// Wait for READ and WRITE command ptrs to be 0
+// Wait for READ and WRITE circular buffer command pointers to be equal
 void ft81x_wait_finish();
 
 extern uint16_t ft81x_chip_id;
