@@ -65,6 +65,53 @@ uint16_t ft81x_width = 0;
 // FT81x screen height
 uint16_t ft81x_height = 0;
 
+// FT813 touch screen state loaded by calls to get_touch_inputs
+//// Capacitive touch state
+static struct {
+  uint8_t mode;
+  uint8_t extended;
+  uint32_t touch1_xy;
+  uint32_t touch4_y;
+  uint32_t touch0_xy;
+  uint32_t tag0_xy;  
+  uint32_t tag0;
+  uint32_t tag1_xy;  
+  uint32_t tag1;
+  uint32_t tag2_xy;
+  uint32_t tag2;
+  uint32_t tag3_xy;
+  uint32_t tag3;
+  uint32_t tag4_xy;
+  uint32_t tag4;
+  uint32_t touch4_x;
+  uint32_t touch2_xy;
+  uint32_t touch3_xy;
+} ft81x_ctouch;
+
+//// touch tracker state
+static struct {
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker0;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker1;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker2;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker3;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker4;
+} ft81x_touch;
+
 // Our device config configured for ESP32+FT81X
 // to work around no variable dummy byte and more issues.
 spi_device_interface_config_t ft81x_spi_devcfg={
@@ -220,6 +267,12 @@ bool ft81x_initGPU() {
   int ft81x_height = ft81x_rd16(REG_VSIZE);
   printf("FT81X REG_HSIZE:%i  REG_VSIZE:%i\n", ft81x_width, ft81x_height);
 
+  // Initialize the touch and audio settings
+  ft81x_wr(REG_CTOUCH_EXTENDED, 1);   // Turn on=0/(off=1) multi-touch
+  ft81x_wr(REG_VOL_PB, 0);            // Turn playback volume off
+  ft81x_wr(REG_VOL_SOUND, 0);         // Turn synthesizer volume off
+  ft81x_wr(REG_SOUND, MUTE);          // Set synthesizer to 'Mute'
+
 #if 1 // Test with black screen before starting display clock
   // Build a black display and display it
   ft81x_stream_start(); // Start streaming
@@ -263,65 +316,137 @@ bool ft81x_initGPU() {
 #endif
 
 
-#if 0 // Test LOAD_IMAGE with a transparent PNG
+#if 1 // Test LOAD_IMAGE ON and OFF with a transparent PNG and update when touched
+  uint32_t imgptr, widthptr, heightptr;
+  uint32_t ptron, ptroff, ptrnext, width, height;
+  
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
 
-  // Start streaming
+  // Load the OFF image
+  //// Start streaming
   ft81x_stream_start();
-  
-  // Load the image at address 0
-  ft81x_cmd_loadimage(0, OPT_RGB565);
-  
-  // spool the image to the FT81X
-  ft81x_cSPOOL((uint8_t *)transparent_test_file_png, transparent_test_file_png_len);
-  
-  // Get the decompressed image properties
-  uint32_t imgptr, widthptr, heightptr;
+
+  //// Load the image at address 0
+  ptroff = 0;
+  ft81x_cmd_loadimage(ptroff, OPT_RGB565 | OPT_NODL);
+
+  //// spool the image to the FT81X
+  ft81x_cSPOOL((uint8_t *)transparent_test_file_off_png, transparent_test_file_off_png_len);
+
+  //// Get the decompressed image properties
   ft81x_cmd_getprops(&imgptr, &widthptr, &heightptr);
 
-  // Trigger FT81x to read the command buffer  
+  //// Trigger FT81x to read the command buffer  
   ft81x_getfree(0);
 
-  // Finish streaming to command buffer
+  //// Finish streaming to command buffer
   ft81x_stream_stop();
-  
-  // Wait till the GPU is finished
+
+  //// Wait till the GPU is finished
   ft81x_wait_finish();
 
-  // Dump results
-  uint32_t ptr = ft81x_rd32(imgptr);
-  uint32_t width = ft81x_rd32(widthptr);
-  uint32_t height = ft81x_rd32(heightptr);
-  ESP_LOGW(TAG, "loadimage: ptr:0x%04x width: 0x%04x height: 0x%04x", ptr, width, height);
+  //// Dump results
+  ptron = ft81x_rd32(imgptr); // pointer to end of image and start of next free memory
+  width = ft81x_rd32(widthptr);
+  height = ft81x_rd32(heightptr);
+  ESP_LOGW(TAG, "loadimage off: start:0x%04x end: 0x%04x width: 0x%04x height: 0x%04x", ptroff, ptron-1, width, height);
 
-  // Start streaming
+  // Load the ON image
+  //// Start streaming
   ft81x_stream_start();
 
-  ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
-  ft81x_clear_color_rgb32(0xfdfdfd);
-  ft81x_clear();
-
-  // Define the bitmap we want to draw
-  ft81x_bitmap_source(0);
-  ft81x_bitmap_layout(ARGB4, 75*2, 75);
-  ft81x_bitmap_size(NEAREST, BORDER, BORDER, 75, 75);
-
-  // Draw the image a few times
-  ft81x_begin(BITMAPS);
-  ft81x_vertex2ii(100, 100, 0, 0);
-  ft81x_vertex2ii(200, 100, 0, 0);   
-  ft81x_vertex2ii(300, 100, 0, 0);
-  ft81x_end();
-  ft81x_display();
+  //// Load the image at address transparent_test_file_png_len+1
+  ft81x_cmd_loadimage(ptron, OPT_RGB565 | OPT_NODL);
   
-  // Trigger FT81x to read the command buffer  
+  //// spool the image to the FT81X
+  ft81x_cSPOOL((uint8_t *)transparent_test_file_on_png, transparent_test_file_on_png_len);
+  
+  //// Get the decompressed image properties  
+  ft81x_cmd_getprops(&imgptr, &widthptr, &heightptr);
+
+  //// Trigger FT81x to read the command buffer  
   ft81x_getfree(0);
 
-  // Finish streaming to command buffer
+  //// Finish streaming to command buffer
   ft81x_stream_stop();
+  
+  //// Wait till the GPU is finished
+  ft81x_wait_finish();
+
+  //// Dump results  
+  ptrnext = ft81x_rd32(imgptr); // pointer to end of image and start of next free memory
+  width = ft81x_rd32(widthptr);
+  height = ft81x_rd32(heightptr);
+  ESP_LOGW(TAG, "loadimage off: start:0x%04x end: 0x%04x width: 0x%04x height: 0x%04x", ptron, ptrnext-1, width, height);
+
+  //ft81x_get_touch_inputs();     
+  //ESP_LOGW(TAG, "ctouch mode: 0x%04x extended: 0x%04x", ft81x_ctouch.mode, ft81x_ctouch.extended);
+  
+  // Capture input events and update the image if touched  
+  for (int x=0; x<300; x++) {
+
+      // Start streaming
+      ft81x_stream_start();
+
+      // Define the bitmap we want to draw
+      ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+      ft81x_cmd_swap();     // Set AUTO swap at end of display list        
+
+      // Draw ON/OFF based upon touch
+      if (ft81x_ctouch.tag0) {
+        ESP_LOGW(TAG, "touched");
+        ft81x_bitmap_source(ptron);
+        ft81x_clear_color_rgb32(0x28e800);
+      } else {
+        ft81x_bitmap_source(ptroff);
+        ft81x_clear_color_rgb32(0xfdfdfd);        
+      }
+
+      // Clear the display
+      ft81x_clear();
+
+      // Turn on tagging
+      ft81x_tag_mask(1);
+
+      // Track touches for a specific object
+      //ft81x_cmd_track(1, 1, ft81x_width, ft81x_height, 3); // track touches to the tag
+
+      ft81x_bitmap_layout(ARGB4, 75*2, 75);
+      ft81x_bitmap_size(NEAREST, BORDER, BORDER, 75, 75);
+      ft81x_begin(BITMAPS);
+
+      ft81x_tag(3); // tag the image button #3
+      ft81x_vertex2ii(100, 100, 0, 0);
+
+      // stop tagging
+      ft81x_tag_mask(0);
+
+      // end of commands
+      ft81x_end();
+      ft81x_display();
+
+      // Trigger FT81x to read the command buffer  
+      ft81x_getfree(0);
+
+      // Finish streaming to command buffer
+      ft81x_stream_stop();
+
+      //// Wait till the GPU is finished
+      ft81x_wait_finish();
+
+     // download the display touch memory into ft81x_touch
+     ft81x_get_touch_inputs();
+#if 0
+     ESP_LOGW(TAG, "tag0: %i xy0: 0x%08x", ft81x_ctouch.tag0, ft81x_ctouch.tag0_xy);
+     // multitouch
+     // ESP_LOGW(TAG, "tag1: %i xy0: 0x%08x", ft81x_ctouch.tag1, ft81x_ctouch.tag1_xy);
+#endif
+     // Sleep
+     vTaskDelay(10 / portTICK_PERIOD_MS);
+ 
+  }
 
   // SPI Debugging  
   gpio_set_level(GPIO_NUM_16, 1);
@@ -365,24 +490,69 @@ bool ft81x_initGPU() {
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
-  
-  ft81x_stream_start(); // Start streaming
-  ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
-  ft81x_clear_color_rgb32(0xfdfdfd);
-  ft81x_clear();
-  ft81x_color_rgb32(0xffffff);
-  ft81x_bgcolor_rgb32(0xff0000);
-  ft81x_fgcolor_rgb32(0x0000ff);
-  ft81x_cmd_text(240, 300, 30, OPT_CENTERY, "Hello World");
-  ft81x_cmd_button(10, 10, 140, 100, 31, 0, "OK");
-  ft81x_cmd_number(140, 200, 30, 0, 123);
-  ft81x_cmd_dial(300, 100, 100, OPT_FLAT, 100);
-  ft81x_cmd_toggle(500, 100, 100, 30, 0, 0, "YES\xffNO");
-  ft81x_cmd_spinner(500, 200, 3, 0);  
-  ft81x_display();
-  ft81x_getfree(0);     // trigger FT81x to read the command buffer
-  ft81x_stream_stop();  // Finish streaming to command buffer
+
+  // Wait till the GPU is finished
+  for (int x=0; x<300; x++) {
+      // Sleep
+      vTaskDelay(200 / portTICK_PERIOD_MS);
+
+      // download the display touch memory into ft81x_touch  
+      ft81x_get_touch_inputs();
+
+      ft81x_stream_start(); // Start streaming
+      ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
+      ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+      ft81x_clear_color_rgb32(0xfdfdfd);
+      ft81x_clear();
+      ft81x_color_rgb32(0x101010);
+      ft81x_bgcolor_rgb32(0xff0000);
+      ft81x_fgcolor_rgb32(0x0000ff);
+
+      // Turn off tagging
+      ft81x_tag_mask(0);
+
+      // Draw some text and a number display value of dial
+      ft81x_cmd_text(240, 300, 30, OPT_CENTERY, "Hello World");
+      
+      ft81x_cmd_text(130, 200, 30, OPT_RIGHTX, "TAG");
+      ft81x_cmd_number(140, 200, 30, 0, ft81x_touch.tracker0.tag_value);
+      
+      ft81x_cmd_text(130, 230, 30, OPT_RIGHTX, "VALUE");
+      ft81x_cmd_number(140, 230, 30, 0, ft81x_touch.tracker0.track_value * 100 / 65535);
+      
+      // Turn on tagging
+      ft81x_tag_mask(1);
+
+      ft81x_tag(3); // tag the button #3
+      ft81x_cmd_track(10, 10, 140, 100, 3); // track touches to the tag      
+      ft81x_cmd_button(10, 10, 140, 100, 31, 0, "OK");
+
+      ft81x_tag(4); // tag the button #4
+      ft81x_cmd_track(300, 100, 1, 1, 4); // track touches to the tag
+      ft81x_cmd_dial(300, 100, 100, OPT_FLAT, x * 100);
+
+      uint8_t tstate = rand()%((253+1)-0) + 0;
+      if(tstate > 128)
+        ft81x_bgcolor_rgb32(0x00ff00);
+      else
+        ft81x_bgcolor_rgb32(0xff0000);
+
+      ft81x_tag(5); // tag the spinner #5
+      ft81x_cmd_toggle(500, 100, 100, 30, 0, tstate > 128 ? 0 : 65535, "YES\xffNO");
+
+      // Turn off tagging
+      ft81x_tag_mask(0);
+      
+      // FIXME: Spinner if used above does odd stuff? Seems ok at the end of the display.
+      ft81x_cmd_spinner(500, 200, 3, 0);
+      
+      ft81x_display();
+      ft81x_getfree(0);     // trigger FT81x to read the command buffer
+      ft81x_stream_stop();  // Finish streaming to command buffer
+
+      //// Wait till the GPU is finished
+      ft81x_wait_finish();      
+  }
   
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
@@ -420,7 +590,7 @@ bool ft81x_initGPU() {
   }
 #endif
 
-#if 1 // Draw some dots of rand size, location and color.
+#if 0 // Draw some dots of rand size, location and color.
   for (int x=0; x<300; x++) {
     // SPI Debugging
     gpio_set_level(GPIO_NUM_16, 1);
@@ -690,6 +860,70 @@ uint32_t ft81x_rd32(uint32_t addr)
   
   return ret;
 }
+
+/*
+ * Spool a large block of memory in chunks from the FT81X
+ *
+ * Currently the max chunk size on ESP32 with DMA of 0 is 32 bytes.
+ */
+ void ft81x_rdN(uint32_t addr, uint8_t *results, int8_t len)
+ {
+   while(len) {
+     if (len < CHUNKSIZE) {
+       ft81x_rdn(addr, results, len);
+       // all done
+       break;
+     } else {
+       ft81x_rdn(addr, results, CHUNKSIZE);
+       len-=CHUNKSIZE; results+=CHUNKSIZE; addr+=CHUNKSIZE;
+       if(len<0) len=0;
+     }
+   }
+ }
+
+void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
+  // setup trans memory
+  spi_transaction_ext_t trans;
+  memset(&trans, 0, sizeof(trans));
+
+  // allocate memory for our return data
+  char *recvbuf=heap_caps_malloc(len, MALLOC_CAP_DMA);
+  
+  // set trans options.
+  trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
+  if (ft81x_qio) {
+    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
+    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
+    // Set this transaction to QIO
+    trans.base.flags |= SPI_TRANS_MODE_QIO;
+  }
+  
+  // fake dummy byte shift left 8
+  trans.address_bits = 32;  
+  trans.base.addr = addr << 8;
+  
+  trans.base.length = 32;
+  trans.base.rxlength = len * 8;
+  
+  // point to our RX buffer.
+  trans.base.rx_buffer = recvbuf; // RX buffer
+
+  // start the transaction ISR watches CS bit
+  ft81x_cs(0);
+
+  // transmit our transaction to the ISR
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
+
+  // grab our return data  
+  memcpy(results, recvbuf, len);
+  
+  // end the transaction
+  ft81x_cs(1);
+  
+  // cleanup
+  free(recvbuf);  
+}
+
 
 /*
  * Write 24 bit address + 8 bit value
@@ -994,9 +1228,9 @@ void ft81x_cN(uint8_t *buffer, uint16_t size) {
 
 /*
  * Spool a large block of memory in chunks into the FT81X
- * in 1k chunks
+ * 
+ * Currently the max chunk size on ESP32 with DMA of 0 is 32 bytes.
  */
-#define CHUNKSIZE 0x20
 void ft81x_cSPOOL(uint8_t *buffer, int32_t size) {
   int32_t savesize = size;
  
@@ -1026,13 +1260,47 @@ void ft81x_cSPOOL(uint8_t *buffer, int32_t size) {
  * circular commad buffer
  */
 void ft81x_wait_finish() {
+#if 0
   uint32_t twp = ft81x_wp;
+#endif
   uint16_t rp;
   ft81x_wp &= 0xffc;
   while ( ((rp=ft81x_rp()) != ft81x_wp) ) {
   }
-#if 1
+#if 0
   ESP_LOGW(TAG, "waitfin: twp:0x%04x wp:0x%04x rp:0x%04x", twp, ft81x_wp, rp);
+#endif  
+}
+
+/*
+ * Read the FT813 tracker and ctouch registers 
+ * and update our global touch state structure
+ */
+void ft81x_get_touch_inputs() {
+
+  // read in the tracker memory to our local structure
+  ft81x_rdN(REG_TRACKER, (uint8_t *)&ft81x_touch, sizeof(ft81x_touch));
+
+  // read in a few other touch registers
+  ft81x_ctouch.mode = ft81x_rd32(REG_CTOUCH_MODE) & 0x03;
+  ft81x_ctouch.extended = ft81x_rd32(REG_CTOUCH_EXTENDED) & 0x01;
+  
+  // Read in the ctouch registers depending on multitouch mode some or all.
+  if (!ft81x_ctouch.extended) {
+    // Read in our all ctouch registers. Most are continuous but the last 3 are not :(
+    // If we are in single touch mode then we only need a few registers.    
+    ft81x_rdN(REG_CTOUCH_TOUCH1_XY, (uint8_t *)&ft81x_ctouch.touch1_xy, sizeof(ft81x_ctouch)-(3*4));
+    //// Patch in the last 3 values.
+    ft81x_ctouch.touch4_x = ft81x_rd32(REG_CTOUCH_TOUCH4_X);
+    ft81x_ctouch.touch2_xy = ft81x_rd32(REG_CTOUCH_TOUCH2_XY);
+    ft81x_ctouch.touch3_xy = ft81x_rd32(REG_CTOUCH_TOUCH3_XY);
+  } else {
+    // Only bring in TOUCH0_XY, TAG0_XY and TAG0 for single touch mode
+    ft81x_rdN(REG_CTOUCH_TOUCH0_XY, (uint8_t *)&ft81x_ctouch.touch0_xy, 4*3);
+  }
+#if 0
+  ESP_LOGW(TAG, "ttag: %i val: 0x%08x", ft81x_touch.tracker0.tag_value, ft81x_touch.tracker0.track_value);
+  ESP_LOGW(TAG, "ctag0: %i xy: 0x%08x", ft81x_ctouch.tag0, ft81x_ctouch.tag0_xy);
 #endif  
 }
 
@@ -2140,13 +2408,23 @@ void ft81x_calibrate() {
 /*
  * 5.53 CMD_SETROTATE
  * Rotate the screen
- * FIXME: Update our own internal H/W to reflect display
  */
 void ft81x_cmd_setrotate(uint32_t r) {
   // check that we have enough space then send command
   ft81x_checkfree(8);
   ft81x_cFFFFFF(0x36);
   ft81x_cI(r);
+  
+  // Get our screen size W,H to confirm
+  ft81x_width = ft81x_rd16(REG_HSIZE);
+  ft81x_height = ft81x_rd16(REG_VSIZE);
+  
+  // portrait mode swap w & h
+  if (r & 2) {
+    int t = ft81x_height;
+    ft81x_height = ft81x_width;
+    ft81x_width = t;
+  }
 }
 
 /*

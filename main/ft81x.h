@@ -44,6 +44,11 @@
 //// Enable QUAD spi mode on ESP32 and FT81X
 #define FT81X_QUADSPI         0
 
+// Currently with DMA setting of 0 the ESP32 can only transfer 32 bytes per transaction.
+// Setting DMA mode > 0 has other issues with data not readable. Bugs that may change
+// this later. For now this is the MAX
+#define CHUNKSIZE 0x20
+
 #define SPI_SHIFT_DATA(data, len) __builtin_bswap32((uint32_t)data<<(32-len))
 #define SPI_REARRANGE_DATA(data, len) (__builtin_bswap32(data)>>(32-len))
 #define WRITE_OP              1
@@ -133,6 +138,41 @@
 #define DECR                  4
 #define INVERT                5
 
+// Table 4-15 Sound Effect
+#define SILENCE            0x00
+#define SQUAREWAVE         0x01
+#define SINEWAVE           0x02
+#define SAWTOOTH           0x03
+#define TRIANGLE           0x04
+#define BEEPING            0x05
+#define ALARM              0x06
+#define WARBLE             0x07
+#define CAROUSEL           0x08
+#define PIPS(n)    (0x0f + (n))
+#define HARP               0x40
+#define XYLOPHONE          0x41
+#define TUBA               0x42
+#define GLOCKENSPIEL       0x43
+#define ORGAN              0x44
+#define TRUMPET            0x45
+#define PIANO              0x46
+#define CHIMES             0x47
+#define MUSICBOX           0x48
+#define BELL               0x49
+#define CLICK              0x50
+#define SWITCH             0x51
+#define COWBELL            0x52
+#define NOTCH              0x53
+#define HIHAT              0x54
+#define KICKDRUM           0x55
+#define POP                0x56
+#define CLACK              0x57
+#define CHACK              0x58
+#define MUTE               0x60
+#define UNMUTE             0x61
+
+
+
 // MEMORY MAP DEFINES
 #define RAM_G          0x000000UL // General purpose graphics RAM
 #define ROM_FONT       0x1e0000UL // Font table and bitmap
@@ -141,48 +181,80 @@
 #define RAM_REG        0x302000UL // Registers
 #define RAM_CMD        0x308000UL // Command Buffer
 
-// REGISTERS                       BITSRW DESC
-#define REG_ID         0x302000UL //  8RO Chip id 0x7ch
-#define REG_FRAMES     0x302004UL // 32RO frame counter since reset
-#define REG_CLOCK      0x302008UL // 32RO Clock cyc since reset
-#define REG_FREQUENCY  0x30200cUL // 28RW Main clock frequency (Hz)
-#define REG_RENDERMODE 0x302010UL //  1RW Render mode : 0 = normal, 1 = single line
-#define REG_SNAPY      0x302014UL // 11RW Scanline select for RENDERMODE 1
-#define REG_SNAPSHOT   0x302018UL //  1RW Trigger for RENDERMODE 1
-#define REG_SNAPFORMAT 0x30201cUL //  6RW Pixel format for scanline redout
-#define REG_TAP_CRC    0x302024UL // 32RO Live video tap crc. Frame CRC is
-#define REG_TAP_MASK   0x302028UL // 32RW Live video tap mask
-#define REG_HCYCLE     0x30202CUL // 12RW Horizontal total cycle count
-#define REG_HOFFSET    0x302030UL // 12RW Horizontal display start offset
-#define REG_HSIZE      0x302034UL // 12RW Horizontal display pixel count
-#define REG_HSYNC0     0x302038UL // 12RW Horizontal sync fall offset
-#define REG_HSYNC1     0x30203cUL // 12RW Horizontal sync rise offset
+// REGISTERS                             BITSRW DESC
+#define REG_ID               0x302000UL //  8RO Chip id 0x7ch
+#define REG_FRAMES           0x302004UL // 32RO frame counter since reset
+#define REG_CLOCK            0x302008UL // 32RO Clock cyc since reset
+#define REG_FREQUENCY        0x30200cUL // 28RW Main clock frequency (Hz)
+#define REG_RENDERMODE       0x302010UL //  1RW Render mode : 0 = normal, 1 = single line
+#define REG_SNAPY            0x302014UL // 11RW Scanline select for RENDERMODE 1
+#define REG_SNAPSHOT         0x302018UL //  1RW Trigger for RENDERMODE 1
+#define REG_SNAPFORMAT       0x30201cUL //  6RW Pixel format for scanline redout
+#define REG_TAP_CRC          0x302024UL // 32RO Live video tap crc. Frame CRC is
+#define REG_TAP_MASK         0x302028UL // 32RW Live video tap mask
+#define REG_HCYCLE           0x30202CUL // 12RW Horizontal total cycle count
+#define REG_HOFFSET          0x302030UL // 12RW Horizontal display start offset
+#define REG_HSIZE            0x302034UL // 12RW Horizontal display pixel count
+#define REG_HSYNC0           0x302038UL // 12RW Horizontal sync fall offset
+#define REG_HSYNC1           0x30203cUL // 12RW Horizontal sync rise offset
 
-#define REG_VCYCLE     0x302040UL // 12RW Vertical total cycle count
-#define REG_VOFFSET    0x302044UL // 12RW Vertical display start offset
-#define REG_VSIZE      0x302048UL // 12RW Vertical display line count
-#define REG_VSYNC0     0x30204cUL // 10RW Vertical sync fall offset
-#define REG_VSYNC1     0x302050UL // 10RW Vertical sync rise offset
-#define REG_ROTATE     0x302058UL //  3RW Screen rot control. norm, invert, mirror portrait etc.
+#define REG_VCYCLE           0x302040UL // 12RW Vertical total cycle count
+#define REG_VOFFSET          0x302044UL // 12RW Vertical display start offset
+#define REG_VSIZE            0x302048UL // 12RW Vertical display line count
+#define REG_VSYNC0           0x30204cUL // 10RW Vertical sync fall offset
 
-#define REG_DITHER     0x302060UL //  1RW Output dither enable
-#define REG_PCLK_POL   0x30206cUL //  1RW PCLK Polarity out on edge 0=rise 1=fall
-#define REG_PCLK       0x302070UL //  8RW PCLK frequency divider, 0=disable
+#define REG_VSYNC1           0x302050UL // 10RW Vertical sync rise offset
+#define REG_ROTATE           0x302058UL //  3RW Screen rot control. norm, invert, mirror portrait etc.
 
-#define REG_SWIZZLE    0x302064UL //  4RW Output RGB signal swizzle
-//#define REG_     0x3020UL // 
+#define REG_DITHER           0x302060UL //  1RW Output dither enable
+#define REG_SWIZZLE          0x302064UL //  4RW Output RGB signal swizzle
+#define REG_PCLK_POL         0x30206cUL //  1RW PCLK Polarity out on edge 0=rise 1=fall
 
+#define REG_PCLK             0x302070UL //  8RW PCLK frequency divider, 0=disable
+#define REG_TAG              0x30207cUL //  8RO Tag of touched objected
 
-#define REG_GPIO_DIR   0x302090UL //  8RW Legacy GPIO pin direction 0=In 1=Out
-#define REG_GPIO       0x302094UL //  8RW Legacy GPIO pin direction
-#define REG_GPIOX_DIR  0x302098UL // 16RW Extended GPIO pin direction 0=In 1=Out
-#define REG_GPIOX      0x30209cUL // 16RW Extended GPIO read/write
-#define REG_PWM_DUTY   0x3020d4UL //  8RW Back-light PWM duty cycle
+#define REG_VOL_PB           0x302080UL //  8RW Playback volume of file/stream
+#define REG_VOL_SOUND        0x302084UL //  8RW Playback volume of synthesizer
+#define REG_SOUND            0x302088UL // 16RW Select synthesized sound effect 
 
-#define REG_CMD_READ   0x3020f8UL // 12RW Command buffer read pointer
-#define REG_CMD_WRITE  0x3020fcUL // 12RO Command buffer write pointer
+#define REG_GPIO_DIR         0x302090UL //  8RW Legacy GPIO pin direction 0=In 1=Out
+#define REG_GPIO             0x302094UL //  8RW Legacy GPIO pin direction
+#define REG_GPIOX_DIR        0x302098UL // 16RW Extended GPIO pin direction 0=In 1=Out
+#define REG_GPIOX            0x30209cUL // 16RW Extended GPIO read/write
+#define REG_PWM_DUTY         0x3020d4UL //  8RW Back-light PWM duty cycle
 
-#define REG_SPI_WIDTH  0x302188UL //  3RW QSPI bus width and dummy cycle setting
+#define REG_CMD_READ         0x3020f8UL // 12RW Command buffer read pointer
+#define REG_CMD_WRITE        0x3020fcUL // 12RO Command buffer write pointer
+
+// CTE Registers
+#define REG_CTOUCH_MODE      0x302104UL //  2RW 00=Off 11=On
+#define REG_CTOUCH_EXTENDED  0x302108UL //  1RW 0=Extended Mode 1=Compatability mode
+#define REG_CTOUCH_TOUCH1_XY 0x30211cUL // 32RO X & Y second touch point
+#define REG_CTOUCH_TOUCH4_Y  0x302120UL // 15RO Y fifth touch point
+#define REG_CTOUCH_TOUCH0_XY 0x302124UL // 32RO X & Y First touch point
+#define REG_CTOUCH_TAG0_XY   0x302128UL // 32RO XY used to calculate the tag of first touch point
+#define REG_CTOUCH_TAG0      0x30212cUL //  8RO Tag result of first touch point
+#define REG_CTOUCH_TAG1_XY   0x302130UL // 32RO XY used to calculate the tag of second touch point
+#define REG_CTOUCH_TAG1      0x302134UL //  8RO Tag result of second touch point
+#define REG_CTOUCH_TAG2_XY   0x302138UL // 32RO XY used to calculate the tag of third touch point
+#define REG_CTOUCH_TAG2      0x30213cUL //  8RO Tag result of third touch point
+#define REG_CTOUCH_TAG3_XY   0x302140UL // 32RO XY used to calculate the tag of forth touch point
+#define REG_CTOUCH_TAG3      0x302144UL //  8RO Tag result of forth touch point
+#define REG_CTOUCH_TAG4_XY   0x302148UL // 32RO XY used to calculate the tag of fifth touch point
+#define REG_CTOUCH_TAG4      0x30214cUL //  8RO Tag result of fifth touch point
+#define REG_CTOUCH_TOUCH4_X  0x30216cUL // 16RO X fifth touch point
+#define REG_CTOUCH_TOUCH2_XY 0x30218cUL // 32RO X & Y third touch point
+#define REG_CTOUCH_TOUCH3_XY 0x302190UL // 32RO X & Y forth touch point
+
+// SPI
+#define REG_SPI_WIDTH        0x302188UL //  3RW QSPI bus width and dummy cycle setting
+
+// FT81X Special registers
+#define REG_TRACKER          0x309000UL // 32RO Track and TAG value 0
+#define REG_TRACKER_1        0x309004UL // 32RO Track and TAG value 1
+#define REG_TRACKER_2        0x309008UL // 32RO Track and TAG value 2
+#define REG_TRACKER_3        0x30900cUL // 32RO Track and TAG value 3
+#define REG_TRACKER_4        0x309010UL // 32RO Track and TAG value 4
 
 // COMMANDS 
 #define CMD_ACTIVE         0x00   // Switch from standby/sleep/pwrdown to active mode
@@ -233,6 +305,10 @@ uint16_t ft81x_rd16(uint32_t addr);
 // Send a 16 bit address + dummy and read the 32 bit response
 uint32_t ft81x_rd32(uint32_t addr);
 
+// Send a 16 bit address + dummy and read the N byte response in chunks
+void ft81x_rdN(uint32_t addr, uint8_t *results, int8_t len);
+void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len);
+  
 // Send a 16 bit address and write 8 bits of data
 void ft81x_wr(uint32_t addr, uint8_t byte);
 
@@ -581,6 +657,9 @@ void ft81x_logo();
 
 // Wait for READ and WRITE circular buffer command pointers to be equal
 void ft81x_wait_finish();
+
+// Read in touch tag and tracker memory from FT813 to our local global structure
+void ft81x_get_touch_inputs();
 
 extern uint16_t ft81x_chip_id;
 
