@@ -12,7 +12,7 @@
  *  the FT81X. It also allow for QUAD SPI communications where
  *  permitted to increase data transfer speeds.
  *
- *  
+ *
  *  @copyright Copyright (C) 2018 Nu Tech Software Solutions, Inc.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -34,7 +34,7 @@
 
 /*
  * Defines
- */ 
+ */
 
 // General settings/utils
 //// 5-8mhz is the best I see so far
@@ -66,7 +66,7 @@
 #define EDGE_STRIP_B          8
 #define RECTS                 9
 
-// Table 7 BITMAP_LAYOUT format list 
+// Table 7 BITMAP_LAYOUT format list
 #define ARGB1555              0
 #define L1                    1
 #define L4                    2
@@ -215,7 +215,7 @@
 
 #define REG_VOL_PB           0x302080UL //  8RW Playback volume of file/stream
 #define REG_VOL_SOUND        0x302084UL //  8RW Playback volume of synthesizer
-#define REG_SOUND            0x302088UL // 16RW Select synthesized sound effect 
+#define REG_SOUND            0x302088UL // 16RW Select synthesized sound effect
 
 #define REG_GPIO_DIR         0x302090UL //  8RW Legacy GPIO pin direction 0=In 1=Out
 #define REG_GPIO             0x302094UL //  8RW Legacy GPIO pin direction
@@ -256,7 +256,7 @@
 #define REG_TRACKER_3        0x30900cUL // 32RO Track and TAG value 3
 #define REG_TRACKER_4        0x309010UL // 32RO Track and TAG value 4
 
-// COMMANDS 
+// COMMANDS
 #define CMD_ACTIVE         0x00   // Switch from standby/sleep/pwrdown to active mode
 #define CMD_STANDBY        0x41   // Put FT81X into standby mode
 #define CMD_SLEEP          0x42   // Put FT81X core to sleep mode
@@ -276,7 +276,7 @@
 
 /*
  * Prototypes
- */ 
+ */
 
 // Initialize the ESP32 SPI device driver for the FT81X chip attached to the VSPI pins
 bool ft81x_initSPI();
@@ -308,7 +308,7 @@ uint32_t ft81x_rd32(uint32_t addr);
 // Send a 16 bit address + dummy and read the N byte response in chunks
 void ft81x_rdN(uint32_t addr, uint8_t *results, int8_t len);
 void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len);
-  
+
 // Send a 16 bit address and write 8 bits of data
 void ft81x_wr(uint32_t addr, uint8_t byte);
 
@@ -550,7 +550,7 @@ void ft81x_cmd_videoframe(uint32_t dst, uint32_t ptr);
 // 5.24 CMD_MEMCRC - Compute a CRC-32 for memory
 uint32_t ft81x_cmd_memcrc(uint32_t ptr, uint32_t num);
 
-// 5.25 CMD_MEMZERO - Write zero to a block of memory 
+// 5.25 CMD_MEMZERO - Write zero to a block of memory
 void ft81x_cmd_memzero(uint32_t ptr, uint32_t num);
 
 // 5.26 CMD_MEMSET - Fill memory with a byte value
@@ -565,11 +565,11 @@ void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t f
 // 5.29 CMD_CLOCK - draw an analog clock
 void ft81x_cmd_clock(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint16_t h, uint16_t m, uint16_t s, uint16_t ms);
 
-// 5.30 CMD_FGCOLOR - set the foreground color 
+// 5.30 CMD_FGCOLOR - set the foreground color
 void ft81x_fgcolor_rgb32(uint32_t rgb);
 void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 
-// 5.31 CMD_BGCOLOR - set the background color 
+// 5.31 CMD_BGCOLOR - set the background color
 void ft81x_bgcolor_rgb32(uint32_t rgb);
 void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 
@@ -615,10 +615,10 @@ void ft81x_cmd_loadidentity();
 
 // 5.45 CMD_SETMATRIX FIXME - Write the current matrix to the display list
 void ft81x_cmd_setmatrix();
-  
+
 // 5.46 CMD_GETMATRIX FIXME - Retrieves the current matrix within the context of the co-processor engine
 void ft81x_cmd_getmatrix(int32_t *a, int32_t *b, int32_t *c, int32_t *d, int32_t *e, int32_t *f);
-  
+
 // 5.47 CMD_GETPTR FIXME - Get the end memory address of data inflated by CMD_INFLATE
 void ft81x_cmd_getptr(uint32_t *result);
 
@@ -661,7 +661,7 @@ void ft81x_cmd_setfont2(uint32_t handle, uint32_t font, uint32_t ptr, uint32_t f
 
 // 5.60 CMD_SETSCRATCH - Set the scratch bitmap for widget use
 void ft81x_cmd_setscratch(uint32_t handle);
-  
+
 // 5.61 CMD_ROMFONT - Load a ROM font into bitmap handle
 void ft81x_cmd_romfont(uint32_t font, uint32_t slot);
 

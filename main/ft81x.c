@@ -14,7 +14,7 @@
  *  ESP32 are both little-endian so byte order does not need to
  *  be adjusted.
  *
- *  
+ *
  *  @copyright Copyright (C) 2018 Nu Tech Software Solutions, Inc.
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +47,7 @@
 
 /*
  * Constants/Statics/Globals
- */ 
+ */
 // Debug tag
 static const char *TAG = "ESP32-FT81X";
 // SPI device driver handle for our ft81x
@@ -73,9 +73,9 @@ static struct {
   uint32_t touch1_xy;
   uint32_t touch4_y;
   uint32_t touch0_xy;
-  uint32_t tag0_xy;  
+  uint32_t tag0_xy;
   uint32_t tag0;
-  uint32_t tag1_xy;  
+  uint32_t tag1_xy;
   uint32_t tag1;
   uint32_t tag2_xy;
   uint32_t tag2;
@@ -128,14 +128,14 @@ spi_device_interface_config_t ft81x_spi_devcfg={
 /*
  * Core functions
  */
- 
+
 /*
  * Initialize the ESP32 spi device driver and connection to our FT81X chip.
- * This is a shared bus for devices like a flash disk. 
+ * This is a shared bus for devices like a flash disk.
  * see spi_master.c for more details on how the driver switches baud,
- * bits, modes and such on the fly depending on what device it is 
+ * bits, modes and such on the fly depending on what device it is
  * currently in a transaction with. This does require using transactions
- * on all of the code unless it was assured the spi port settings were 
+ * on all of the code unless it was assured the spi port settings were
  * set correctly at the time of the transmission.
  */
 bool ft81x_initSPI() {
@@ -146,7 +146,7 @@ bool ft81x_initSPI() {
   .mosi_io_num = GPIO_NUM_23,
   .sclk_io_num = GPIO_NUM_18,
   .quadwp_io_num = GPIO_NUM_22,
-  .quadhd_io_num = GPIO_NUM_21  
+  .quadhd_io_num = GPIO_NUM_21
   };
 
   //Initialize the SPI bus
@@ -175,9 +175,9 @@ bool ft81x_initSPI() {
     ESP_LOGE(TAG, "Failed to add CS pin");
     return false;
   }
-  
+
   ft81x_cs(1); // inactive CS
-  
+
   return true;
 }
 
@@ -185,14 +185,14 @@ bool ft81x_initSPI() {
  * Initialize the FT81x GPU and test for a valid chip response
  */
 bool ft81x_initGPU() {
-    
+
   // Init global ft81x_chip_id to 0
   ft81x_chip_id = 0;
 
   // FIXME: Just in case we are stuck in QUAD mode I need to get out
   // or no commands will be taken
   ft81x_qio = 1;
-  ft81x_wr16(REG_SPI_WIDTH, 0b00);    
+  ft81x_wr16(REG_SPI_WIDTH, 0b00);
   ft81x_qio = 0;
 
   // Put the FT81x to sleep
@@ -201,13 +201,13 @@ bool ft81x_initGPU() {
   ft81x_hostcmd(CMD_CLKSEL_A, 0x00);
   // ACTIVE
   ft81x_hostcmd(CMD_ACTIVE, 0x00);
-  // CLKINT  
+  // CLKINT
   ft81x_hostcmd(CMD_CLKINT, 0x00);
   // PD_ROMS all powered on
   ft81x_hostcmd(CMD_PD_ROMS, 0x00);
   // RST_PULSE
   ft81x_hostcmd(CMD_RST_PULSE, 0x00);
-  
+
   // Read our CHIP ID address until it returns a valid result
   uint16_t ret = 0;
   uint16_t count = 0;
@@ -222,16 +222,16 @@ bool ft81x_initGPU() {
   //ESP_LOGW(TAG, "HWID: 0x%04x", ret);
   // Save our CHIP ID
   ft81x_chip_id = ret;
-  
+
   // Set the PWM to 0 turn off the backlight
   ft81x_wr(REG_PWM_DUTY, 0);
- 
+
   // Enable QUAD spi mode if configured
   #if (FT81X_QUADSPI)
     // Enable QAUD spi mode no dummy
     ft81x_wr16(REG_SPI_WIDTH, 0b010);
     ft81x_qio = 1;
-    //ft81x_wr16(REG_SPI_WIDTH, 0b00);    
+    //ft81x_wr16(REG_SPI_WIDTH, 0b00);
     //ft81x_qio = 0;
   #else
     // Enable single channel spi mode
@@ -241,7 +241,7 @@ bool ft81x_initGPU() {
 
   // Reset the command fifo state vars
   ft81x_reset_fifo();
-  
+
   // Screen specific settings
   // NHD-7.0-800480FT-CSXV-CTP
   // http://newhavendisplay.com/learnmore/EVE2_7-CSXV-CTP/
@@ -261,7 +261,7 @@ bool ft81x_initGPU() {
   ft81x_wr32(REG_PCLK_POL, 1);
   ft81x_wr(REG_ROTATE, 0);
   ft81x_wr(REG_SWIZZLE, 0);
-  
+
   // Get our screen size W,H to confirm
   int ft81x_width = ft81x_rd16(REG_HSIZE);
   int ft81x_height = ft81x_rd16(REG_VSIZE);
@@ -277,7 +277,7 @@ bool ft81x_initGPU() {
   // Build a black display and display it
   ft81x_stream_start(); // Start streaming
   ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-  ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+  ft81x_cmd_swap();     // Set AUTO swap at end of display list
   ft81x_clear_color_rgb32(0x000000);
   ft81x_clear();
   ft81x_display();
@@ -306,11 +306,11 @@ bool ft81x_initGPU() {
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
-  
+
   ft81x_logo();
   ft81x_calibrate();
-  
-  // SPI Debugging  
+
+  // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
 #endif
@@ -319,7 +319,7 @@ bool ft81x_initGPU() {
 #if 1 // Test LOAD_IMAGE ON and OFF with a transparent PNG and update when touched
   uint32_t imgptr, widthptr, heightptr;
   uint32_t ptron, ptroff, ptrnext, width, height;
-  
+
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
@@ -338,7 +338,7 @@ bool ft81x_initGPU() {
   //// Get the decompressed image properties
   ft81x_cmd_getprops(&imgptr, &widthptr, &heightptr);
 
-  //// Trigger FT81x to read the command buffer  
+  //// Trigger FT81x to read the command buffer
   ft81x_getfree(0);
 
   //// Finish streaming to command buffer
@@ -359,32 +359,32 @@ bool ft81x_initGPU() {
 
   //// Load the image at address transparent_test_file_png_len+1
   ft81x_cmd_loadimage(ptron, OPT_RGB565 | OPT_NODL);
-  
+
   //// spool the image to the FT81X
   ft81x_cSPOOL((uint8_t *)transparent_test_file_on_png, transparent_test_file_on_png_len);
-  
-  //// Get the decompressed image properties  
+
+  //// Get the decompressed image properties
   ft81x_cmd_getprops(&imgptr, &widthptr, &heightptr);
 
-  //// Trigger FT81x to read the command buffer  
+  //// Trigger FT81x to read the command buffer
   ft81x_getfree(0);
 
   //// Finish streaming to command buffer
   ft81x_stream_stop();
-  
+
   //// Wait till the GPU is finished
   ft81x_wait_finish();
 
-  //// Dump results  
+  //// Dump results
   ptrnext = ft81x_rd32(imgptr); // pointer to end of image and start of next free memory
   width = ft81x_rd32(widthptr);
   height = ft81x_rd32(heightptr);
   ESP_LOGW(TAG, "loadimage off: start:0x%04x end: 0x%04x width: 0x%04x height: 0x%04x", ptron, ptrnext-1, width, height);
 
-  //ft81x_get_touch_inputs();     
+  //ft81x_get_touch_inputs();
   //ESP_LOGW(TAG, "ctouch mode: 0x%04x extended: 0x%04x", ft81x_ctouch.mode, ft81x_ctouch.extended);
-  
-  // Capture input events and update the image if touched  
+
+  // Capture input events and update the image if touched
   for (int x=0; x<300; x++) {
 
       // Start streaming
@@ -392,7 +392,7 @@ bool ft81x_initGPU() {
 
       // Define the bitmap we want to draw
       ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-      ft81x_cmd_swap();     // Set AUTO swap at end of display list        
+      ft81x_cmd_swap();     // Set AUTO swap at end of display list
 
       // Draw ON/OFF based upon touch
       if (ft81x_ctouch.tag0) {
@@ -401,7 +401,7 @@ bool ft81x_initGPU() {
         ft81x_clear_color_rgb32(0x28e800);
       } else {
         ft81x_bitmap_source(ptroff);
-        ft81x_clear_color_rgb32(0xfdfdfd);        
+        ft81x_clear_color_rgb32(0xfdfdfd);
       }
 
       // Clear the display
@@ -427,7 +427,7 @@ bool ft81x_initGPU() {
       ft81x_end();
       ft81x_display();
 
-      // Trigger FT81x to read the command buffer  
+      // Trigger FT81x to read the command buffer
       ft81x_getfree(0);
 
       // Finish streaming to command buffer
@@ -445,13 +445,13 @@ bool ft81x_initGPU() {
 #endif
      // Sleep
      vTaskDelay(10 / portTICK_PERIOD_MS);
- 
+
   }
 
-  // SPI Debugging  
+  // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
-  
+
 #endif
 
 #if 0 // Test memory operation(s) and CRC32 on 6 bytes of 0x00 will be 0xB1C2A1A3
@@ -464,19 +464,19 @@ bool ft81x_initGPU() {
 
   // Write a predictable sequence of bytes to a memory location
   ft81x_cmd_memzero(0, 0x0006);
-  
+
   // Calculate crc on the bytes we wrote
   uint32_t r = ft81x_cmd_memcrc(0, 0x0006);
-  
-  // Trigger FT81x to read the command buffer  
+
+  // Trigger FT81x to read the command buffer
   ft81x_getfree(0);
-  
+
   // Finish streaming to command buffer
   ft81x_stream_stop();
 
   // Wait till the GPU is finished
   ft81x_wait_finish();
-  
+
   // Dump results
   uint32_t res = ft81x_rd32(r);
   ESP_LOGW(TAG, "crc: ptr: 0x%04x val: 0x%4x expected: 0xB1C2A1A3", r, res);
@@ -496,12 +496,12 @@ bool ft81x_initGPU() {
       // Sleep
       vTaskDelay(200 / portTICK_PERIOD_MS);
 
-      // download the display touch memory into ft81x_touch  
+      // download the display touch memory into ft81x_touch
       ft81x_get_touch_inputs();
 
       ft81x_stream_start(); // Start streaming
       ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-      ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+      ft81x_cmd_swap();     // Set AUTO swap at end of display list
       ft81x_clear_color_rgb32(0xfdfdfd);
       ft81x_clear();
       ft81x_color_rgb32(0x101010);
@@ -513,21 +513,21 @@ bool ft81x_initGPU() {
 
       // Draw some text and a number display value of dial
       ft81x_cmd_text(240, 300, 30, OPT_CENTERY, "Hello World");
-      
+
       ft81x_cmd_text(130, 200, 30, OPT_RIGHTX, "TAG");
       ft81x_cmd_number(140, 200, 30, 0, ft81x_touch.tracker0.tag_value);
-      
+
       ft81x_cmd_text(130, 230, 30, OPT_RIGHTX, "VALUE");
       ft81x_cmd_number(140, 230, 30, 0, ft81x_touch.tracker0.track_value * 100 / 65535);
-     
+
       ft81x_bgcolor_rgb32(0x007f7f);
       ft81x_cmd_clock(730,80,50,0,12,1,2,4);
-      
+
       // Turn on tagging
       ft81x_tag_mask(1);
 
       ft81x_tag(3); // tag the button #3
-      ft81x_cmd_track(10, 10, 140, 100, 3); // track touches to the tag      
+      ft81x_cmd_track(10, 10, 140, 100, 3); // track touches to the tag
       ft81x_cmd_button(10, 10, 140, 100, 31, 0, "OK");
 
       ft81x_tag(4); // tag the button #4
@@ -545,24 +545,24 @@ bool ft81x_initGPU() {
 
       // Turn off tagging
       ft81x_tag_mask(0);
-      
+
       // Draw a keyboard
       ft81x_cmd_keys(10, 400, 300, 50, 26, 0, "12345");
-      
+
       // FIXME: Spinner if used above does odd stuff? Seems ok at the end of the display.
       ft81x_cmd_spinner(500, 200, 3, 0);
-      
+
       ft81x_display();
       ft81x_getfree(0);     // trigger FT81x to read the command buffer
       ft81x_stream_stop();  // Finish streaming to command buffer
 
       //// Wait till the GPU is finished
-      ft81x_wait_finish();      
+      ft81x_wait_finish();
   }
-  
+
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
-  gpio_set_level(GPIO_NUM_16, 0);    
+  gpio_set_level(GPIO_NUM_16, 0);
 #endif
 
 #if 0 // Fill the screen with a solid color cycling colors
@@ -571,10 +571,10 @@ bool ft81x_initGPU() {
     // SPI Debugging
     gpio_set_level(GPIO_NUM_16, 1);
     gpio_set_level(GPIO_NUM_16, 0);
-    
+
     ft81x_stream_start(); // Start streaming
     ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-    ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+    ft81x_cmd_swap();     // Set AUTO swap at end of display list
     ft81x_clear_color_rgb32(rgb);
     ft81x_clear();
     ft81x_color_rgb32(0xffffff);
@@ -583,7 +583,7 @@ bool ft81x_initGPU() {
     ft81x_display();
     ft81x_getfree(0);     // trigger FT81x to read the command buffer
     ft81x_stream_stop();  // Finish streaming to command buffer
-    
+
     // rotate colors
     rgb>>=8; if(!rgb) rgb=0xff0000;
 
@@ -592,7 +592,7 @@ bool ft81x_initGPU() {
 
     // SPI Debugging
     gpio_set_level(GPIO_NUM_16, 1);
-    gpio_set_level(GPIO_NUM_16, 0);    
+    gpio_set_level(GPIO_NUM_16, 0);
   }
 #endif
 
@@ -606,25 +606,25 @@ bool ft81x_initGPU() {
     //ft81x_alpha_funct(0b111, 0b00000000);
     //ft81x_bitmap_handle(0b10101010);
     ft81x_bitmap_layout(0b11111, 0x00, 0x00);
-    
+
     ft81x_cmd_dlstart();  // Set REG_CMD_DL when done
-    ft81x_cmd_swap();     // Set AUTO swap at end of display list    
+    ft81x_cmd_swap();     // Set AUTO swap at end of display list
     ft81x_clear_color_rgb32(0x000000);
     ft81x_clear();
-    
+
     ft81x_fgcolor_rgb32(0xffffff);
     ft81x_bgcolor_rgb32(0xffffff);
-    
+
     uint8_t rred, rgreen, rblue;
     rred = rand()%((253+1)-0) + 0;
     rgreen = rand()%((253+1)-0) + 0;
-    rblue = rand()%((253+1)-0) + 0;            
+    rblue = rand()%((253+1)-0) + 0;
     ft81x_color_rgb888(rred, rgreen, rblue);
     ft81x_begin(POINTS);
     uint16_t size = rand()%((600+1)-0) + 0;
     uint16_t rndx = rand()%((ft81x_width+1)-0) + 0;
     uint16_t rndy = rand()%((ft81x_height+1)-0) + 0;
-    ft81x_point_size(size);    
+    ft81x_point_size(size);
     ft81x_vertex2f(rndx<<4,rndy<<4); // defaut is 1/16th pixel precision
     ESP_LOGW(TAG, "c: x:%i y:%i z:%i", rndx, rndy, size);
     ft81x_display();
@@ -639,7 +639,7 @@ bool ft81x_initGPU() {
 
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
-  gpio_set_level(GPIO_NUM_16, 0);    
+  gpio_set_level(GPIO_NUM_16, 0);
 
 #endif
 
@@ -652,7 +652,7 @@ bool ft81x_initGPU() {
  */
 void ft81x_reset_fifo() {
   ft81x_wp = 0;
-  ft81x_freespace = 4096 - 4;  
+  ft81x_freespace = 4096 - 4;
 }
 
 /*
@@ -661,7 +661,7 @@ void ft81x_reset_fifo() {
 uint32_t ft81x_getwp() {
   return RAM_CMD + (ft81x_wp & 0xffc);
 }
-  
+
 /*
  * Wrapper for CS to allow easier debugging
  */
@@ -669,8 +669,8 @@ void ft81x_cs(uint8_t n) {
   gpio_set_level(GPIO_NUM_5, n);
 #if 0 // Testing SPI
   ets_delay_us(10);
-#endif  
-} 
+#endif
+}
 
 /*
  * Write 16 bit command+arg and dummy byte
@@ -683,40 +683,40 @@ void ft81x_hostcmd(uint8_t command, uint8_t args) {
   spi_transaction_ext_t trans;
   memset(&trans, 0, sizeof(trans));
 
-  // arg plus dummy 16 bits 
+  // arg plus dummy 16 bits
   uint16_t dargs = args << 8;
-  
+
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_CMD;
-  
-  // fake dummy byte shift left 8  
+
+  // fake dummy byte shift left 8
   trans.command_bits = 8;
   trans.base.cmd = command;
   trans.base.tx_buffer = &dargs;
   trans.base.length = 16;
-    
+
   trans.base.rx_buffer = NULL;
 
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
 
-  // start the transaction ISR watches the CS bit 
+  // start the transaction ISR watches the CS bit
   ft81x_cs(0);
-    
+
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
-  
+
   // end the transaction
   ft81x_cs(1);
-  
+
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
 
 }
 
 /*
- * Write 24 bit address + dummy byte 
- * and read the 8 bit result. 
+ * Write 24 bit address + dummy byte
+ * and read the 8 bit result.
  * A total of 6 bytes will be on the SPI BUS.
  */
 uint8_t ft81x_rd(uint32_t addr)
@@ -727,23 +727,23 @@ uint8_t ft81x_rd(uint32_t addr)
 
   // allocate memory for our return data
   char *recvbuf=heap_caps_malloc(1, MALLOC_CAP_DMA);
-  
+
   // set trans options.
-  trans.base.flags = SPI_TRANS_VARIABLE_ADDR;  
+  trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
   if (ft81x_qio) {
     // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
     trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
     // Set this transaction to QIO
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
-  
+
   // fake dummy byte shift left 8
-  trans.address_bits = 32;  
+  trans.address_bits = 32;
   trans.base.addr = addr << 8;
-  
+
   trans.base.length = 8;
   trans.base.rxlength = 8;
-  
+
   // point to our RX buffer.
   trans.base.rx_buffer = recvbuf; // RX buffer
 
@@ -753,21 +753,21 @@ uint8_t ft81x_rd(uint32_t addr)
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data  
+  // grab our return data
   uint8_t ret = *((uint8_t *)recvbuf);
-  
+
   // end the transaction
   ft81x_cs(1);
-  
+
   // cleanup
   free(recvbuf);
-  
+
   return ret;
 }
 
 /*
- * Write 24 bit address + dummy byte 
- * and read the 16 bit result. 
+ * Write 24 bit address + dummy byte
+ * and read the 16 bit result.
  * A total of 6 bytes will be on the SPI BUS.
  */
 uint16_t ft81x_rd16(uint32_t addr)
@@ -778,7 +778,7 @@ uint16_t ft81x_rd16(uint32_t addr)
 
   // allocate memory for our return data
   char *recvbuf=heap_caps_malloc(2, MALLOC_CAP_DMA);
-  
+
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
   if (ft81x_qio) {
@@ -787,14 +787,14 @@ uint16_t ft81x_rd16(uint32_t addr)
     // Set this transaction to QIO
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
-  
+
   // fake dummy byte shift left 8
-  trans.address_bits = 32;  
+  trans.address_bits = 32;
   trans.base.addr = addr << 8;
-  
+
   trans.base.length = 16;
   trans.base.rxlength = 16;
-  
+
   // point to our RX buffer.
   trans.base.rx_buffer = recvbuf; // RX buffer
 
@@ -804,21 +804,21 @@ uint16_t ft81x_rd16(uint32_t addr)
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data  
+  // grab our return data
   uint16_t ret = *((uint16_t *)recvbuf);
-  
+
   // end the transaction
   ft81x_cs(1);
-  
+
   // cleanup
   free(recvbuf);
-  
+
   return ret;
 }
 
 /*
- * Write 24 bit address + dummy byte 
- * and read the 32 bit result. 
+ * Write 24 bit address + dummy byte
+ * and read the 32 bit result.
  * A total of 8 bytes will be on the SPI BUS.
  */
 uint32_t ft81x_rd32(uint32_t addr)
@@ -829,7 +829,7 @@ uint32_t ft81x_rd32(uint32_t addr)
 
   // allocate memory for our return data
   char *recvbuf=heap_caps_malloc(4, MALLOC_CAP_DMA);
-  
+
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
   if (ft81x_qio) {
@@ -838,14 +838,14 @@ uint32_t ft81x_rd32(uint32_t addr)
     // Set this transaction to QIO
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
-  
+
   // fake dummy byte shift left 8
-  trans.address_bits = 32;  
+  trans.address_bits = 32;
   trans.base.addr = addr << 8;
-  
+
   trans.base.length = 32;
   trans.base.rxlength = 32;
-  
+
   // point to our RX buffer.
   trans.base.rx_buffer = recvbuf; // RX buffer
 
@@ -855,15 +855,15 @@ uint32_t ft81x_rd32(uint32_t addr)
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data  
+  // grab our return data
   uint32_t ret = *((uint32_t *)recvbuf);
-  
+
   // end the transaction
   ft81x_cs(1);
-  
+
   // cleanup
   free(recvbuf);
-  
+
   return ret;
 }
 
@@ -894,7 +894,7 @@ void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
 
   // allocate memory for our return data
   char *recvbuf=heap_caps_malloc(len, MALLOC_CAP_DMA);
-  
+
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
   if (ft81x_qio) {
@@ -903,14 +903,14 @@ void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
     // Set this transaction to QIO
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
-  
+
   // fake dummy byte shift left 8
-  trans.address_bits = 32;  
+  trans.address_bits = 32;
   trans.base.addr = addr << 8;
-  
+
   trans.base.length = 32;
   trans.base.rxlength = len * 8;
-  
+
   // point to our RX buffer.
   trans.base.rx_buffer = recvbuf; // RX buffer
 
@@ -920,14 +920,14 @@ void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data  
+  // grab our return data
   memcpy(results, recvbuf, len);
-  
+
   // end the transaction
   ft81x_cs(1);
-  
+
   // cleanup
-  free(recvbuf);  
+  free(recvbuf);
 }
 
 
@@ -956,7 +956,7 @@ void ft81x_wr(uint32_t addr, uint8_t byte) {
   trans.base.length = 8;
   trans.base.rx_buffer = NULL;
   trans.base.tx_buffer = &byte;
-  
+
   // start the transaction ISR watches CS bit
   ft81x_cs(0);
 
@@ -965,7 +965,7 @@ void ft81x_wr(uint32_t addr, uint8_t byte) {
 
   // end the transaction
   ft81x_cs(1); //inactive CS
-  
+
 }
 
 /*
@@ -993,7 +993,7 @@ void ft81x_wr16(uint32_t addr, uint16_t word) {
   trans.base.length = 16;
   trans.base.rx_buffer = NULL;
   trans.base.tx_buffer = &word;
-  
+
   // start the transaction ISR watches CS bit
   ft81x_cs(0); //active CS
 
@@ -1002,7 +1002,7 @@ void ft81x_wr16(uint32_t addr, uint16_t word) {
 
   // end the transaction
   ft81x_cs(1); //inactive CS
-  
+
 }
 
 /*
@@ -1039,7 +1039,7 @@ void ft81x_wr32(uint32_t addr, uint32_t word) {
 
   // end the transaction
   ft81x_cs(1); // inactive CS
-  
+
 }
 
 /*
@@ -1082,7 +1082,7 @@ void ft81x_start(uint32_t addr, uint8_t write) {
     // Set this transaction to QIO
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
-  
+
   // set write bit if rw=1
   addr |= (write ? 0x800000 : 0);
   addr = SPI_REARRANGE_DATA(addr, 24);
@@ -1091,10 +1091,10 @@ void ft81x_start(uint32_t addr, uint8_t write) {
   trans.base.tx_buffer = &addr;
 
   // start the transaction ISR watches CS bit
-  ft81x_cs(0); // active CS  
+  ft81x_cs(0); // active CS
 
   // transmit our transaction to the ISR
-  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans); 
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 }
 
 /*
@@ -1110,13 +1110,13 @@ void ft81x_stream_start() {
 
 /*
  * Close any open transactions.
- * De-assert CS pin  
+ * De-assert CS pin
  */
 void ft81x_stream_stop() {
   // end the transaction
-  ft81x_cs(1); // inactive CS  
+  ft81x_cs(1); // inactive CS
 }
- 
+
 /*
  * Get free space from FT81x until it reports
  * we have required space. Also triggers processing
@@ -1125,13 +1125,13 @@ void ft81x_stream_stop() {
 void ft81x_getfree(uint16_t required)
 {
   ft81x_wp &= 0xfff;
-  ft81x_stream_stop();  
-  
+  ft81x_stream_stop();
+
   // force command to complete write to CMD_WRITE
   ft81x_wr16(REG_CMD_WRITE, ft81x_wp & 0xffc);
-    
+
   do {
-    vTaskDelay(10 / portTICK_PERIOD_MS);    
+    vTaskDelay(10 / portTICK_PERIOD_MS);
     uint16_t rp = ft81x_rp();
     uint16_t howfull = (ft81x_wp - rp) & 4095;
     ft81x_freespace = (4096 - 4) - howfull;
@@ -1180,7 +1180,7 @@ void ft81x_cmd32(uint32_t word) {
 
   ft81x_wp += sizeof(word);
   ft81x_freespace -= sizeof(word);
- 
+
   // setup trans memory
   spi_transaction_ext_t trans;
   memset(&trans, 0, sizeof(trans));
@@ -1211,7 +1211,7 @@ void ft81x_cN(uint8_t *buffer, uint16_t size) {
 
   ft81x_wp += size;
   ft81x_freespace -= size;
- 
+
   // setup trans memory
   spi_transaction_ext_t trans;
   memset(&trans, 0, sizeof(trans));
@@ -1234,35 +1234,35 @@ void ft81x_cN(uint8_t *buffer, uint16_t size) {
 
 /*
  * Spool a large block of memory in chunks into the FT81X
- * 
+ *
  * Currently the max chunk size on ESP32 with DMA of 0 is 32 bytes.
  */
 void ft81x_cSPOOL(uint8_t *buffer, int32_t size) {
   int32_t savesize = size;
- 
+
   while(size) {
     if (size < CHUNKSIZE) {
       // check that we have enough space then send command
       ft81x_checkfree(size);
-      ft81x_cN((uint8_t *)buffer, size);      
+      ft81x_cN((uint8_t *)buffer, size);
       // all done
       break;
     } else {
-      ft81x_checkfree(CHUNKSIZE);      
+      ft81x_checkfree(CHUNKSIZE);
       ft81x_cN((uint8_t *)buffer, CHUNKSIZE);
       size-=CHUNKSIZE; buffer+=CHUNKSIZE;
       if(size<0) size=0;
     }
   }
 
-  int8_t align = (4 - (savesize & 0x3)) & 0x3; 
+  int8_t align = (4 - (savesize & 0x3)) & 0x3;
   ft81x_checkfree(align);
   ft81x_align(savesize);
 }
 
 /*
  * Wait until REG_CMD_READ == REG_CMD_WRITE indicating
- * the GPU has processed all of the commands in the 
+ * the GPU has processed all of the commands in the
  * circular commad buffer
  */
 void ft81x_wait_finish() {
@@ -1275,11 +1275,11 @@ void ft81x_wait_finish() {
   }
 #if 0
   ESP_LOGW(TAG, "waitfin: twp:0x%04x wp:0x%04x rp:0x%04x", twp, ft81x_wp, rp);
-#endif  
+#endif
 }
 
 /*
- * Read the FT813 tracker and ctouch registers 
+ * Read the FT813 tracker and ctouch registers
  * and update our global touch state structure
  */
 void ft81x_get_touch_inputs() {
@@ -1290,11 +1290,11 @@ void ft81x_get_touch_inputs() {
   // read in a few other touch registers
   ft81x_ctouch.mode = ft81x_rd32(REG_CTOUCH_MODE) & 0x03;
   ft81x_ctouch.extended = ft81x_rd32(REG_CTOUCH_EXTENDED) & 0x01;
-  
+
   // Read in the ctouch registers depending on multitouch mode some or all.
   if (!ft81x_ctouch.extended) {
     // Read in our all ctouch registers. Most are continuous but the last 3 are not :(
-    // If we are in single touch mode then we only need a few registers.    
+    // If we are in single touch mode then we only need a few registers.
     ft81x_rdN(REG_CTOUCH_TOUCH1_XY, (uint8_t *)&ft81x_ctouch.touch1_xy, sizeof(ft81x_ctouch)-(3*4));
     //// Patch in the last 3 values.
     ft81x_ctouch.touch4_x = ft81x_rd32(REG_CTOUCH_TOUCH4_X);
@@ -1307,7 +1307,7 @@ void ft81x_get_touch_inputs() {
 #if 0
   ESP_LOGW(TAG, "ttag: %i val: 0x%08x", ft81x_touch.tracker0.tag_value, ft81x_touch.tracker0.track_value);
   ESP_LOGW(TAG, "ctag0: %i xy: 0x%08x", ft81x_ctouch.tag0, ft81x_ctouch.tag0_xy);
-#endif  
+#endif
 }
 
 /*
@@ -1333,7 +1333,7 @@ void ft81x_swap() {
  */
 void ft81x_alpha_funct(uint8_t func, uint8_t ref) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI(
       ( 0x09UL                 << 24) | // CMD 0x09      24 - 31
                                         // RESERVED      11 - 23
@@ -1345,7 +1345,7 @@ void ft81x_alpha_funct(uint8_t func, uint8_t ref) {
 /*
  * 4.5 BEGIN
  * Begin drawing a graphics primitive
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_begin(uint8_t prim) {
   // check that we have enough space then send command
@@ -1383,7 +1383,7 @@ void ft81x_bitmap_layout(uint8_t format, uint16_t linestride, uint16_t height) {
 /*
  * 4.8 BITMAP_LAYOUT_H
  * Specify the 2 most significant bits of the source bitmap memory format and layout for the current handle
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_bitmap_layout_h(uint8_t linestride, uint8_t height) {
   // check that we have enough space then send command
@@ -1422,7 +1422,7 @@ void ft81x_bitmap_size(uint8_t filter, uint8_t wrapx, uint8_t wrapy, uint16_t wi
  */
 void ft81x_bitmap_size_h(uint8_t width, uint8_t height) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x29UL << 24) | (((width) & 0x3) << 2) | (((height) & 0x3) << 0));
 }
 
@@ -1433,18 +1433,18 @@ void ft81x_bitmap_size_h(uint8_t width, uint8_t height) {
  */
 void ft81x_bitmap_source(uint32_t addr) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x01UL << 24) | ((addr & 0x3fffffL) << 0));
 }
 
 /*
  * 4.12 BITMAP_TRANSFORM_A
  * Specify the A coefficient of the bitmap transform matrix
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_bitmap_transform_a(uint32_t a) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x15UL << 24) | ((a & 0xffffL) << 0));
 }
 
@@ -1455,18 +1455,18 @@ void ft81x_bitmap_transform_a(uint32_t a) {
  */
 void ft81x_bitmap_transform_b(uint32_t b) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x16UL << 24) | ((b & 0xffffL) << 0));
 }
 
 /*
  * 4.14 BITMAP_TRANSFORM_C
  * Specify the C coefficient of the bitmap transform matrix
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_bitmap_transform_c(uint32_t c) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x17UL << 24) | ((c & 0xffffffL) << 0));
 }
 
@@ -1477,29 +1477,29 @@ void ft81x_bitmap_transform_c(uint32_t c) {
  */
 void ft81x_bitmap_transform_d(uint32_t d) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x18UL << 24) | ((d & 0xffffL) << 0));
 }
 
 /*
  * 4.16 BITMAP_TRANSFORM_E
  * Specify the E coefficient of the bitmap transform matrix
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_bitmap_transform_e(uint32_t e) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x19UL << 24) | ((e & 0xffffL) << 0));
 }
 
 /*
  * 4.17 BITMAP_TRANSFORM_F
  * Specify the F coefficient of the bitmap transform matrix
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_bitmap_transform_f(uint32_t f) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x1aUL << 24) | ((f & 0xffffffL) << 0));
 }
 
@@ -1510,14 +1510,14 @@ void ft81x_bitmap_transform_f(uint32_t f) {
  */
 void ft81x_blend_func(uint8_t src, uint8_t dst) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x0bUL << 24) | ((src & 0x7L) << 3) | ((dst & 0x7L) << 0));
 }
 
 /*
  * 4.19 CALL
  * Execute a sequence of commands at another location in the display list
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_call(uint16_t dest) {
   // check that we have enough space then send command
@@ -1528,11 +1528,11 @@ void ft81x_call(uint16_t dest) {
 /*
  * 4.20 CELL
  * Specify the bitmap cell number for the VERTEX2F command
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_cell(uint8_t cell) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x06UL << 24) | ((cell & 0x7fL) << 0));
 }
 
@@ -1590,33 +1590,33 @@ void ft81x_clear_color_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 /*
  * 4.24 CLEAR_STENCIL
  * Specify clear value for the stencil buffer
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_clear_stencil(uint8_t stencil) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x11UL << 24) | ((stencil & 0xffL) << 0));
 }
 
 /*
  * 4.25 CLEAR_TAG
  * Specify clear value for the tag buffer
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_clear_tag(uint8_t tag) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x12UL << 24) | ((tag & 0xffL) << 0));
 }
 
 /*
  * 4.26 COLOR_A
  * Set the current color alpha
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_color_a(uint8_t alpha) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x10UL << 24) | ((alpha & 0xffL) << 0));
 }
 
@@ -1634,7 +1634,7 @@ void ft81x_color_mask(uint8_t red, uint8_t green, uint8_t blue, uint8_t alpha) {
 /*
  * 4.28 COLOR_RGB
  * Set the current color red, green, blue
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_color_rgb32(uint32_t rgb) {
   // check that we have enough space then send command
@@ -1649,7 +1649,7 @@ void ft81x_color_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 /*
  * 4.29 DISPLAY
  * End the display list. FT81X will ignore all commands following this command.
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_display() {
   // check that we have enough space then send command
@@ -1660,18 +1660,18 @@ void ft81x_display() {
 /*
  * 4.30 END
  * End drawing a graphics primitive
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_end() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x21UL << 24));
 }
 
 /*
  * 4.31 JUMP
  * Execute commands at another location in the display list
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_jump(uint16_t dest) {
   // check that we have enough space then send command
@@ -1682,18 +1682,18 @@ void ft81x_jump(uint16_t dest) {
 /*
  * 4.32 LINE_WIDTH
  * Specify the width of lines to be drawn with primitive LINES in 1/16 pixel precision
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_line_width(uint16_t width) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x0eUL << 24) | (width & 0xfff));
 }
 
 /*
  * 4.33 MACRO
  * Execute a single command from a macro register
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_macro(uint8_t macro) {
   // check that we have enough space then send command
@@ -1704,29 +1704,29 @@ void ft81x_macro(uint8_t macro) {
 /*
  * 4.34 NOP
  * No Operation
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_nop() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x2dUL << 24));
 }
 
 /*
  * 4.35 PALETTE_SOURCE
  * Specify the base address of the palette
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_palette_source(uint32_t addr) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x2aUL << 24) | ((addr) & 0x3fffffUL));
 }
 
 /*
  * 4.36 POINT_SIZE
  * Specify the radius of points
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_point_size(uint16_t size) {
   // check that we have enough space then send command
@@ -1737,62 +1737,62 @@ void ft81x_point_size(uint16_t size) {
 /*
  * 4.37 RESTORE_CONTEXT
  * Restore the current graphics context from the context stack
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_restore_context() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x23UL << 24));
 }
 
 /*
  * 4.38 RETURN
  * Return from a previous CALL command
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_return() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x24UL << 24));
 }
 
 /*
  * 4.39 SAVE_CONTEXT
  * Push the current graphics context on the context stack
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_save_context() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x22UL << 24));
 }
 
 /*
  * 4.40 SCISSOR_SIZE
  * Specify the size of the scissor clip rectangle
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_scissor_size(uint16_t width, uint16_t height) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x1cUL << 24) | ((width & 0xfffL) << 12) | ((height & 0xfffL) << 0));
 }
 
 /*
  * 4.41 SCISSOR_XY
  * Specify the top left corner of the scissor clip rectangle
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_scissor_xy(uint16_t x, uint16_t y) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x1bUL << 24) | ((x & 0x7ffL) << 11) | ((y & 0x7ffL) << 0));
 }
 
 /*
  * 4.42 STENCIL_FUNC
  * Set function and reference value for stencil testing
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_stencil_func(uint8_t func, uint8_t ref, uint8_t mask) {
   // check that we have enough space then send command
@@ -1803,18 +1803,18 @@ void ft81x_stencil_func(uint8_t func, uint8_t ref, uint8_t mask) {
 /*
  * 4.43 STENCIL_MASK
  * Control the writing of individual bits in the stencil planes
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_stencil_mask(uint8_t mask) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x013UL << 24) | ((mask & 0xffL) << 0));
 }
 
 /*
  * 4.44 STENCIL_OP
  * Set stencil test actions
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_stencil_op(uint8_t sfail, uint8_t spass) {
   // check that we have enough space then send command
@@ -1826,7 +1826,7 @@ void ft81x_stencil_op(uint8_t sfail, uint8_t spass) {
  * 4.45 TAG
  * Attach the tag value for the following graphics objects
  * drawn on the screen. The initial tag buffer value is 255.
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_tag(uint8_t s) {
   // check that we have enough space then send command
@@ -1837,7 +1837,7 @@ void ft81x_tag(uint8_t s) {
 /*
  * 4.46 TAG_MASK
  * Control the writing of the tag buffer
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_tag_mask(uint8_t mask) {
   // check that we have enough space then send command
@@ -1849,7 +1849,7 @@ void ft81x_tag_mask(uint8_t mask) {
  * 4.47 VERTEX2F
  * Start the operation of graphics primitives at the specified
  * screen coordinate, in the pixel precision defined by VERTEX_FORMAT
- * SM20180828:QA:PASS   
+ * SM20180828:QA:PASS
  */
 void ft81x_vertex2f(int16_t x, int16_t y) {
   // check that we have enough space then send command
@@ -1882,36 +1882,36 @@ void ft81x_vertex2ii(int16_t x, int16_t y, uint8_t handle, uint8_t cell) {
  */
 void ft81x_vertex_format(int8_t frac) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x27UL << 24) | (((frac) & 0x7) << 0));
 }
 
 /*
  * 4.50 VERTEX_TRANSLATE_X
  * Specify the vertex transformation’s X translation component
-* SM20180828:QA:PASS 
+* SM20180828:QA:PASS
  */
 void ft81x_vertex_translate_x(uint32_t x) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x2bUL << 24) | (((x) & 0x1ffffUL) << 0));
 }
 
 /*
  * 4.51 VERTEX_TRANSLATE_Y
  * Specify the vertex transformation’s Y translation component
-* SM20180828:QA:PASS 
+* SM20180828:QA:PASS
  */
 void ft81x_vertex_translate_y(uint32_t y) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cI((0x2cUL << 24) | (((y) & 0x1ffffUL) << 0));
 }
 
 /*
  * 5.11 CMD_DLSTART
  * Start a new display list
- * SM20180828:QA:PASS  
+ * SM20180828:QA:PASS
  */
 void ft81x_cmd_dlstart() {
   // check that we have enough space then send command
@@ -1922,7 +1922,7 @@ void ft81x_cmd_dlstart() {
 /*
  * 5.12 CMD_SWAP
  * Swap the current display list
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_cmd_swap() {
   // check that we have enough space then send command
@@ -1933,7 +1933,7 @@ void ft81x_cmd_swap() {
 /*
  * 5.13 CMD_COLDSTART
  * This command sets the co-processor engine to default reset states
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_cmd_coldstart() {
   // check that we have enough space then send command
@@ -1956,7 +1956,7 @@ void ft81x_cmd_interrupt(uint32_t ms) {
 /*
  * 5.15 CMD_APPEND
  * Append more commands to current display list
- * SM20180828:QA:PASS 
+ * SM20180828:QA:PASS
  */
 void ft81x_cmd_append(uint32_t ptr, uint32_t num) {
   // check that we have enough space then send command
@@ -1976,15 +1976,15 @@ void ft81x_cmd_regread(uint32_t ptr, uint32_t* result) {
   ft81x_checkfree(8);
   ft81x_cFFFFFF(0x19);
   ft81x_cI(ptr);
-  
+
   // The data will be written starting here in the buffer so get the pointer
   uint32_t r = ft81x_getwp();
-  
+
   // Fill in memory where results will go with dummy data
   ft81x_cI(0xffffffff); // Will be result
-  
+
   // report back memory locations of the results to caller
-  *result = r;  
+  *result = r;
 }
 
 /*
@@ -2075,14 +2075,14 @@ void ft81x_cmd_videoframe(uint32_t dst, uint32_t ptr) {
 uint32_t ft81x_cmd_memcrc(uint32_t ptr, uint32_t num) {
   // check that we have enough space then send command
   ft81x_checkfree(16);
-  
+
   ft81x_cFFFFFF(0x18);
   ft81x_cI(ptr);
   ft81x_cI(num);
 
   // The data will be written here in the buffer so get the pointer
   uint32_t r = ft81x_getwp();
-   
+
   // Dummy data where our results will go
   ft81x_cI(0xffffffff);
   return r;
@@ -2090,7 +2090,7 @@ uint32_t ft81x_cmd_memcrc(uint32_t ptr, uint32_t num) {
 
 /*
  * 5.25 CMD_MEMZERO
- * Write zero to a block of memory 
+ * Write zero to a block of memory
  */
 void ft81x_cmd_memzero(uint32_t ptr, uint32_t num) {
   // check that we have enough space then send command
@@ -2139,7 +2139,7 @@ void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t f
   b[5] = options;
   uint32_t len = strlen(s)+1;
   int8_t align = (4 - (len & 0x3)) & 0x3;
-  
+
   // check that we have enough space then send command
   ft81x_checkfree(4+sizeof(b)+len+align);
   ft81x_cFFFFFF(0x0d);
@@ -2161,8 +2161,8 @@ void ft81x_cmd_clock(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint1
   b[4] = h;
   b[5] = m;
   b[6] = s;
-  b[7] = ms;  
- 
+  b[7] = ms;
+
   // check that we have enough space then send command
   ft81x_checkfree(4+sizeof(b));
   ft81x_cFFFFFF(0x14);
@@ -2172,12 +2172,12 @@ void ft81x_cmd_clock(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint1
 
 /*
  * 5.30 CMD_FGCOLOR
- * set the foreground color 
-* SM20180828:QA:PASS 
+ * set the foreground color
+* SM20180828:QA:PASS
  */
 void ft81x_fgcolor_rgb32(uint32_t rgb) {
   // check that we have enough space then send command
-  ft81x_checkfree(8);  
+  ft81x_checkfree(8);
   ft81x_cFFFFFF(0x0a);
   ft81x_cI(rgb);
 }
@@ -2187,7 +2187,7 @@ void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 
 /*
  * 5.31 CMD_BGCOLOR
- * Set the background color 
+ * Set the background color
  */
 void ft81x_bgcolor_rgb32(uint32_t rgb) {
   // check that we have enough space then send command
@@ -2224,7 +2224,7 @@ void ft81x_cmd_gauge(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t
   b[2] = r;
   b[3] = options;
   b[4] = major;
-  b[4] = minor;  
+  b[4] = minor;
   b[5] = val;
   b[6] = range;
   // check that we have enough space then send command
@@ -2247,7 +2247,7 @@ void ft81x_cmd_gradient(int16_t x0, int16_t y0, uint32_t rgb0, int16_t x1, int16
   b[5] = y1;
   b[6] = rgb1 >> 16;
   b[7] = rgb1 & 0xffff;
-  
+
   // check that we have enough space then send command
   ft81x_checkfree(4+sizeof(b));
   ft81x_cFFFFFF(0x0b);
@@ -2334,7 +2334,7 @@ void ft81x_cmd_slider(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t optio
   b[5] = val;
   b[6] = range;
   b[7] = 0; // dummy pad
-  
+
   // check that we have enough space then send command
   ft81x_checkfree(4+sizeof(b));
   ft81x_cFFFFFF(0x10);
@@ -2374,7 +2374,7 @@ void ft81x_cmd_toggle(int16_t x, int16_t y, int16_t w, int16_t font, uint16_t op
   b[5] = state;
   uint32_t len = strlen(s)+1;
   int8_t align = (4 - (len & 0x3)) & 0x3;
-     
+
    // check that we have enough space then send command
   ft81x_checkfree(4+sizeof(b)+len+align);
   ft81x_cFFFFFF(0x12);
@@ -2395,7 +2395,7 @@ void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const 
   b[3] = options;
   uint32_t len = strlen(s)+1;
   int8_t align = (4 - (len & 0x3)) & 0x3;
-  
+
   // check that we have enough space then send command
   ft81x_checkfree(4+sizeof(b)+len+align);
   ft81x_cFFFFFF(0x0c);
@@ -2427,9 +2427,9 @@ void ft81x_cmd_number(int16_t x, int16_t y, int16_t font, uint16_t options, int3
    b[3] = options;
    b[4] = n;
    b[5] = 0; // dummy pad
-   
+
    // check that we have enough space then send command
-   ft81x_checkfree(sizeof(b)+4);   
+   ft81x_checkfree(sizeof(b)+4);
    ft81x_cFFFFFF(0x2e);
    ft81x_cN((uint8_t *)&b,sizeof(b));
 }
@@ -2465,7 +2465,7 @@ void ft81x_cmd_getmatrix(int32_t *a, int32_t *b, int32_t *c, int32_t *d, int32_t
 
   // The data will be written starting here in the buffer so get the pointer
   uint32_t r = ft81x_getwp();
-  
+
   // Fill in memory where results will go with dummy data
   ft81x_cI(0xffffffff); // Will be a
   ft81x_cI(0xffffffff); // Will be b
@@ -2473,7 +2473,7 @@ void ft81x_cmd_getmatrix(int32_t *a, int32_t *b, int32_t *c, int32_t *d, int32_t
   ft81x_cI(0xffffffff); // Will be d
   ft81x_cI(0xffffffff); // Will be e
   ft81x_cI(0xffffffff); // Will be f
-  
+
   // report back memory locations of the results to caller
   *a = r;
   r+=4;
@@ -2496,13 +2496,13 @@ void ft81x_cmd_getptr(uint32_t *result) {
   // check that we have enough space then send command
   ft81x_checkfree(8);
   ft81x_cFFFFFF(0x23);
-  
+
   // The data will be written starting here in the buffer so get the pointer
   uint32_t r = ft81x_getwp();
-  
+
   // Fill in memory where results will go with dummy data
   ft81x_cI(0xffffffff); // Will be ptr
-  
+
   // report back memory locations of the results to caller
   *result = r;
 }
@@ -2520,12 +2520,12 @@ void ft81x_cmd_getprops(uint32_t *ptr, uint32_t *width, uint32_t *height) {
 
   // The data will be written starting here in the buffer so get the pointer
   uint32_t r = ft81x_getwp();
-  
+
   // Fill in memory where results will go with dummy data
   ft81x_cI(0xffffffff); // Will be ptr
   ft81x_cI(0xffffffff); // Will be width
   ft81x_cI(0xffffffff); // Will be height
-  
+
   // report back memory locations of the results to caller
   *ptr = r;
   r+=4;
@@ -2572,7 +2572,7 @@ void ft81x_cmd_translate(int32_t tx, int32_t ty) {
 /*
  * 5.52 CMD_CALIBRATE
  * Execute the touch screen calibration routine
- */ 
+ */
 void ft81x_cmd_calibrate(uint32_t *result) {
   // check that we have enough space then send command
   ft81x_checkfree(4);
@@ -2580,10 +2580,10 @@ void ft81x_cmd_calibrate(uint32_t *result) {
 
   // The data will be written starting here in the buffer so get the pointer
   uint32_t r = ft81x_getwp();
-  
+
   // Fill in memory where results will go with dummy data
   ft81x_cI(0xffffffff); // Will be result
-  
+
   // report back memory locations of the results to caller
   *result = r;
 }
@@ -2595,13 +2595,13 @@ void ft81x_calibrate() {
   ft81x_bgcolor_rgb32(0x402000);
   ft81x_fgcolor_rgb32(0x703800);
   ft81x_cmd_dlstart();   // Set REG_CMD_DL when done
-  ft81x_clear();         // Clear the display    
+  ft81x_clear();         // Clear the display
   ft81x_getfree(0);      // trigger FT81x to read the command buffer
-  
+
   ft81x_cmd_text(180, 30, 40, OPT_CENTER, "Please tap on the dot..");
   //ft81x_cmd_calibrate(0);// Calibration command
   //ft81x_cmd_swap();      // Set AUTO swap at end of display list
-  
+
   ft81x_stream_stop();   // Finish streaming to command buffer
   // Wait till the Logo is finished
   ft81x_wait_finish();
@@ -2616,11 +2616,11 @@ void ft81x_cmd_setrotate(uint32_t r) {
   ft81x_checkfree(8);
   ft81x_cFFFFFF(0x36);
   ft81x_cI(r);
-  
+
   // Get our screen size W,H to confirm
   ft81x_width = ft81x_rd16(REG_HSIZE);
   ft81x_height = ft81x_rd16(REG_VSIZE);
-  
+
   // portrait mode swap w & h
   if (r & 2) {
     int t = ft81x_height;
@@ -2642,8 +2642,8 @@ void ft81x_cmd_spinner(int16_t x, int16_t y, int16_t style, int16_t scale) {
 
   // check that we have enough space to run the command
   ft81x_checkfree(sizeof(b)+4);
-  ft81x_cFFFFFF(0x16);  
-  ft81x_cN((uint8_t *)&b,sizeof(b));  
+  ft81x_cFFFFFF(0x16);
+  ft81x_cN((uint8_t *)&b,sizeof(b));
 }
 
 /*
@@ -2652,7 +2652,7 @@ void ft81x_cmd_spinner(int16_t x, int16_t y, int16_t style, int16_t scale) {
  */
 void ft81x_cmd_screensaver() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cFFFFFF(0x2f);
 }
 
@@ -2681,7 +2681,7 @@ void ft81x_cmd_sketch(int16_t x, int16_t y, int16_t w, int16_t h, int16_t ptr, i
  */
 void ft81x_cmd_stop() {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(4);
   ft81x_cFFFFFF(0x17);
 }
 
@@ -2691,7 +2691,7 @@ void ft81x_cmd_stop() {
  */
 void ft81x_cmd_setfont(uint32_t font, uint32_t ptr) {
   // check that we have enough space then send command
-  ft81x_checkfree(12);  
+  ft81x_checkfree(12);
   ft81x_cFFFFFF(0x2b);
   ft81x_cI(font);
   ft81x_cI(ptr);
@@ -2795,7 +2795,7 @@ void ft81x_cmd_setbitmap(uint32_t addr, uint16_t fmt, uint16_t width, uint16_t h
   b[3] = 0;
 
   // check that we have enough space then send command
-  ft81x_checkfree(8+sizeof(b));  
+  ft81x_checkfree(8+sizeof(b));
   ft81x_cFFFFFF(0x43);
   ft81x_cI(addr);
   ft81x_cN((uint8_t *)&b,sizeof(b));
