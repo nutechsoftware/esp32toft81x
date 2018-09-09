@@ -530,7 +530,7 @@ void ft81x_cmd_regread(uint32_t ptr, uint32_t *result);
 void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num, void *mem);
 
 // 5.18 CMD_INFLATE - Decompress data into memory
-void ft81x_cmd_inflate(uint32_t ptr);
+void ft81x_cmd_inflate(uint32_t ptr, uint32_t num, void* mem);
 
 // 5.19 CMD_LOADIMAGE - Load a JPEG or PNG image
 void ft81x_cmd_loadimage(uint32_t ptr, uint32_t options);
@@ -562,6 +562,9 @@ void ft81x_cmd_memcpy(uint32_t dest, uint32_t src, uint32_t num);
 // 5.28 CMD_BUTTON - Draw a button
 void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t font, uint16_t options, const char* s);
 
+// 5.29 CMD_CLOCK - draw an analog clock
+void ft81x_cmd_clock(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint16_t h, uint16_t m, uint16_t s, uint16_t ms);
+
 // 5.30 CMD_FGCOLOR - set the foreground color 
 void ft81x_fgcolor_rgb32(uint32_t rgb);
 void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
@@ -569,6 +572,28 @@ void ft81x_fgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
 // 5.31 CMD_BGCOLOR - set the background color 
 void ft81x_bgcolor_rgb32(uint32_t rgb);
 void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 5.32 CMD_GRADCOLOR - set the 3D button highlight color
+void ft81x_cmd_gradcolor_rgb32(uint32_t rgb);
+void ft81x_cmd_gradcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue);
+
+// 5.33 CMD_GAUGE - draw a gauge
+void ft81x_cmd_gauge(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t major, uint16_t minor, uint16_t val, uint16_t range);
+
+// 5.34 CMD_GRADIENT - draw a smooth color gradient
+void ft81x_cmd_gradient_rgb32(int16_t x0, int16_t y0, uint32_t rgb0, int16_t x1, int16_t y1, uint32_t rgb1);
+
+// 5.35 CMD_KEYS - draw a row of keys
+void ft81x_cmd_keys(int16_t x, int16_t y, int16_t w, int16_t h, int16_t font, uint16_t options, const char *s);
+
+// 5.36 CMD_PROGRESS - draw a progress bar
+void ft81x_cmd_progress(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t options, uint16_t val, uint16_t range);
+
+// 5.37 CMD_SCROLLBAR - draw a scroll bar
+void ft81x_cmd_scrollbar(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t options, uint16_t val, uint16_t size, uint16_t range);
+
+// 5.38 CMD_SLIDER - draw a slider
+void ft81x_cmd_slider(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t options, uint16_t val, uint16_t range);
 
 // 5.39 CMD_DIAL - Draw a rotary dial control
 void ft81x_cmd_dial(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t val);
@@ -579,7 +604,7 @@ void ft81x_cmd_toggle(int16_t x, int16_t y, int16_t w, int16_t font, uint16_t op
 // 5.41 CMD_TEXT - Draw text
 void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const char *s);
 
-// 5.42 CMD_SETBASE - Set the background color 
+// 5.42 CMD_SETBASE - Set the base for number output
 void ft81x_cmd_setbase(uint32_t b);
 
 // 5.43 CMD_NUMBER - Draw number

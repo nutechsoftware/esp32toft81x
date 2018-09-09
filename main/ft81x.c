@@ -49,7 +49,7 @@
  * Constants/Statics/Globals
  */ 
 // Debug tag
-static const char* TAG = "ESP32-FT81X";
+static const char *TAG = "ESP32-FT81X";
 // SPI device driver handle for our ft81x
 spi_device_handle_t ft81x_spi;
 // FT81X section 5.2 Chip ID
@@ -519,6 +519,9 @@ bool ft81x_initGPU() {
       
       ft81x_cmd_text(130, 230, 30, OPT_RIGHTX, "VALUE");
       ft81x_cmd_number(140, 230, 30, 0, ft81x_touch.tracker0.track_value * 100 / 65535);
+     
+      ft81x_bgcolor_rgb32(0x007f7f);
+      ft81x_cmd_clock(730,80,50,0,12,1,2,4);
       
       // Turn on tagging
       ft81x_tag_mask(1);
@@ -542,6 +545,9 @@ bool ft81x_initGPU() {
 
       // Turn off tagging
       ft81x_tag_mask(0);
+      
+      // Draw a keyboard
+      ft81x_cmd_keys(10, 400, 300, 50, 26, 0, "12345");
       
       // FIXME: Spinner if used above does odd stuff? Seems ok at the end of the display.
       ft81x_cmd_spinner(500, 200, 3, 0);
@@ -1970,14 +1976,20 @@ void ft81x_cmd_regread(uint32_t ptr, uint32_t* result) {
   ft81x_checkfree(8);
   ft81x_cFFFFFF(0x19);
   ft81x_cI(ptr);
-  // FIXME get data out
-  //ft81x_cI(result);
+  
+  // The data will be written starting here in the buffer so get the pointer
+  uint32_t r = ft81x_getwp();
+  
+  // Fill in memory where results will go with dummy data
+  ft81x_cI(0xffffffff); // Will be result
+  
+  // report back memory locations of the results to caller
+  *result = r;  
 }
 
 /*
  * 5.17 CMD_MEMWRITE
  * Write bytes into memory
- * FIXME
  */
 void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num, void* mem) {
   // check that we have enough space then send command
@@ -1985,20 +1997,17 @@ void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num, void* mem) {
   ft81x_cFFFFFF(0x1a);
   ft81x_cI(ptr);
   ft81x_cI(num);
-  // FIXME stream data in
 }
 
 /*
  * 5.18 CMD_INFLATE
  * Decompress data into memory
- * FIXME
  */
 void ft81x_cmd_inflate(uint32_t ptr) {
   // check that we have enough space then send command
   ft81x_checkfree(8);
   ft81x_cFFFFFF(0x22);
   ft81x_cI(ptr);
-  // FIXME stream data in
 }
 
 /*
@@ -2030,13 +2039,11 @@ void ft81x_cmd_mediafifo(uint32_t ptr, uint32_t size) {
 /*
  * 5.21 CMD_PLAYVIDEO
  * Video playback
- * FIXME
  */
-void ft81x_cmd_playvideo(uint32_t options, uint8_t* data) {
+void ft81x_cmd_playvideo(uint32_t options) {
   // check that we have enough space then send command
   ft81x_checkfree(4);
   ft81x_cFFFFFF(0x40);
-  //FIXME: stream video to FT81X
 }
 
 /*
@@ -2122,7 +2129,7 @@ void ft81x_cmd_memcpy(uint32_t dest, uint32_t src, uint32_t num) {
  * 5.28 CMD_BUTTON
  * Draw a button
  */
-void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t font, uint16_t options, const char* s) {
+void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t font, uint16_t options, const char *s) {
   uint16_t b[6];
   b[0] = x;
   b[1] = y;
@@ -2140,6 +2147,28 @@ void ft81x_cmd_button(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t f
   ft81x_cN((uint8_t *)s, len);
   ft81x_align(len);
 }
+
+/*
+ * 5.29 CMD_CLOCK
+ * Draw an analog clock
+ */
+void ft81x_cmd_clock(uint16_t x, uint16_t y, uint16_t r, uint16_t options, uint16_t h, uint16_t m, uint16_t s, uint16_t ms) {
+  uint16_t b[8];
+  b[0] = x;
+  b[1] = y;
+  b[2] = r;
+  b[3] = options;
+  b[4] = h;
+  b[5] = m;
+  b[6] = s;
+  b[7] = ms;  
+ 
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b));
+  ft81x_cFFFFFF(0x14);
+  ft81x_cN((uint8_t *)b, sizeof(b));
+}
+
 
 /*
  * 5.30 CMD_FGCOLOR
@@ -2171,6 +2200,148 @@ void ft81x_bgcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
 }
 
 /*
+ * 5.32 CMD_GRADCOLOR
+ * Set the 3D button highlight color
+ */
+void ft81x_gradcolor_rgb32(uint32_t rgb) {
+  // check that we have enough space then send command
+  ft81x_checkfree(8);
+  ft81x_cFFFFFF(0x34);
+  ft81x_cI(rgb);
+}
+void ft81x_gradcolor_rgb888(uint8_t red, uint8_t green, uint8_t blue) {
+   ft81x_gradcolor_rgb32(((red & 255L) << 16) | ((green & 255L) << 8) | ((blue & 255L) << 0));
+}
+
+/*
+ * 5.33 CMD_GAUGE
+ * Draw a gauge
+ */
+void ft81x_cmd_gauge(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t major, uint16_t minor, uint16_t val, uint16_t range) {
+  uint16_t b[7];
+  b[0] = x;
+  b[1] = y;
+  b[2] = r;
+  b[3] = options;
+  b[4] = major;
+  b[4] = minor;  
+  b[5] = val;
+  b[6] = range;
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b));
+  ft81x_cFFFFFF(0x13);
+  ft81x_cN((uint8_t *)b,sizeof(b));
+}
+
+/*
+ * 5.34 CMD_GRADIENT
+ * Draw a smooth color gradient
+ */
+void ft81x_cmd_gradient(int16_t x0, int16_t y0, uint32_t rgb0, int16_t x1, int16_t y1, uint32_t rgb1) {
+  uint16_t b[8];
+  b[0] = x0;
+  b[1] = y0;
+  b[2] = rgb0 >> 16;
+  b[3] = rgb0 & 0xffff;
+  b[4] = x1;
+  b[5] = y1;
+  b[6] = rgb1 >> 16;
+  b[7] = rgb1 & 0xffff;
+  
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b));
+  ft81x_cFFFFFF(0x0b);
+  ft81x_cN((uint8_t *)b,sizeof(b));
+}
+
+/*
+ * 5.35 CMD_KEYS
+ * Draw a row of keys
+ */
+void ft81x_cmd_keys(int16_t x, int16_t y, int16_t w, int16_t h, int16_t font, uint16_t options, const char *s) {
+  uint16_t b[6];
+  b[0] = x;
+  b[1] = y;
+  b[2] = w;
+  b[3] = h;
+  b[4] = font;
+  b[5] = options;
+
+  uint32_t len = strlen(s)+1;
+  int8_t align = (4 - (len & 0x3)) & 0x3;
+
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b)+len+align);
+  ft81x_cFFFFFF(0x0e);
+  ft81x_cN((uint8_t *)b,sizeof(b));
+  ft81x_cN((uint8_t *)s, len);
+  ft81x_align(len);
+}
+
+/*
+ * 5.36 CMD_PROGRESS
+ * Draw a progress bar
+ */
+void ft81x_cmd_progress(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t options, uint16_t val, uint16_t range) {
+  uint16_t b[8];
+  b[0] = x;
+  b[1] = y;
+  b[2] = w;
+  b[3] = h;
+  b[4] = options;
+  b[5] = val;
+  b[6] = range;
+  b[7] = 0; // dummy pad
+
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b));
+  ft81x_cFFFFFF(0x0f);
+  ft81x_cN((uint8_t *)b,sizeof(b));
+}
+
+/*
+ * 5.37 CMD_SCROLLBAR
+ * Draw a scroll bar
+ */
+void ft81x_cmd_scrollbar(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t options, uint16_t val, uint16_t size, uint16_t range) {
+  uint16_t b[8];
+  b[0] = x;
+  b[1] = y;
+  b[2] = w;
+  b[3] = h;
+  b[4] = options;
+  b[5] = val;
+  b[6] = size;
+  b[7] = range;
+
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b));
+  ft81x_cFFFFFF(0x11);
+  ft81x_cN((uint8_t *)b,sizeof(b));
+}
+
+/*
+ * 5.38 CMD_SLIDER
+ * Draw a slider
+ */
+void ft81x_cmd_slider(int16_t x, int16_t y, int16_t w, int16_t h, uint16_t options, uint16_t val, uint16_t range) {
+  uint16_t b[8];
+  b[0] = x;
+  b[1] = y;
+  b[2] = w;
+  b[3] = h;
+  b[4] = options;
+  b[5] = val;
+  b[6] = range;
+  b[7] = 0; // dummy pad
+  
+  // check that we have enough space then send command
+  ft81x_checkfree(4+sizeof(b));
+  ft81x_cFFFFFF(0x10);
+  ft81x_cN((uint8_t *)b,sizeof(b));
+}
+
+/*
  * 5.39 CMD_DIAL
  * Draw a rotary dial control
  */
@@ -2193,7 +2364,7 @@ void ft81x_cmd_dial(int16_t x, int16_t y, int16_t r, uint16_t options, uint16_t 
  * 5.40 CMD_TOGGLE
  * Draw a toggle switch
  */
-void ft81x_cmd_toggle(int16_t x, int16_t y, int16_t w, int16_t font, uint16_t options, uint16_t state, const char* s) {
+void ft81x_cmd_toggle(int16_t x, int16_t y, int16_t w, int16_t font, uint16_t options, uint16_t state, const char *s) {
   uint16_t b[6];
   b[0] = x;
   b[1] = y;
@@ -2235,7 +2406,7 @@ void ft81x_cmd_text(int16_t x, int16_t y, int16_t font, uint16_t options, const 
 
 /*
  * 5.42 CMD_SETBASE
- * Set the background color 
+ * Set the base for number output
  */
 void ft81x_cmd_setbase(uint32_t b) {
   // check that we have enough space then send command
@@ -2283,7 +2454,7 @@ void ft81x_cmd_setmatrix() {
   ft81x_cFFFFFF(0x2a);
 }
 
-/* FIXME
+/*
  * 5.46 CMD_GETMATRIX
  * Retrieves the current matrix within the context of the co-processor engine
  */
@@ -2291,25 +2462,49 @@ void ft81x_cmd_getmatrix(int32_t *a, int32_t *b, int32_t *c, int32_t *d, int32_t
   // check that we have enough space then send command
   ft81x_checkfree(4);
   ft81x_cFFFFFF(0x33);
-  // FIXME get data out
-  // ft81x_rd32(a);
-  // ft81x_rd32(b);
-  // ft81x_rd32(c);
-  // ft81x_rd32(d);
-  // ft81x_rd32(e);
-  // ft81x_rd32(f);  
+
+  // The data will be written starting here in the buffer so get the pointer
+  uint32_t r = ft81x_getwp();
+  
+  // Fill in memory where results will go with dummy data
+  ft81x_cI(0xffffffff); // Will be a
+  ft81x_cI(0xffffffff); // Will be b
+  ft81x_cI(0xffffffff); // Will be c
+  ft81x_cI(0xffffffff); // Will be d
+  ft81x_cI(0xffffffff); // Will be e
+  ft81x_cI(0xffffffff); // Will be f
+  
+  // report back memory locations of the results to caller
+  *a = r;
+  r+=4;
+  *b = r;
+  r+=4;
+  *c = r;
+  r+=4;
+  *d = r;
+  r+=4;
+  *e = r;
+  r+=4;
+  *f = r;
 }
 
-/* FIXME
+/*
  * 5.47 CMD_GETPTR
  * Get the end memory address of data inflated by CMD_INFLATE
  */
 void ft81x_cmd_getptr(uint32_t *result) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);  
+  ft81x_checkfree(8);
   ft81x_cFFFFFF(0x23);
-  // FIXME get data out
-  // ft81x_rd32(result);
+  
+  // The data will be written starting here in the buffer so get the pointer
+  uint32_t r = ft81x_getwp();
+  
+  // Fill in memory where results will go with dummy data
+  ft81x_cI(0xffffffff); // Will be ptr
+  
+  // report back memory locations of the results to caller
+  *result = r;
 }
 
 /*
@@ -2377,13 +2572,20 @@ void ft81x_cmd_translate(int32_t tx, int32_t ty) {
 /*
  * 5.52 CMD_CALIBRATE
  * Execute the touch screen calibration routine
- * FIXME: return value, freespace()
  */ 
 void ft81x_cmd_calibrate(uint32_t *result) {
   // check that we have enough space then send command
   ft81x_checkfree(4);
   ft81x_cFFFFFF(0x15);
-  //ft81x_rd32(result);
+
+  // The data will be written starting here in the buffer so get the pointer
+  uint32_t r = ft81x_getwp();
+  
+  // Fill in memory where results will go with dummy data
+  ft81x_cI(0xffffffff); // Will be result
+  
+  // report back memory locations of the results to caller
+  *result = r;
 }
 
 void ft81x_calibrate() {
