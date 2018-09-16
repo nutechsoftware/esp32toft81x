@@ -65,52 +65,18 @@ uint16_t ft81x_width = 0;
 // FT81x screen height
 uint16_t ft81x_height = 0;
 
+// MEDIA FIFO state vars
+uint16_t mf_wp = 0;
+uint32_t mf_size = 0;
+uint32_t mf_base = 0;
+
+
 // FT813 touch screen state loaded by calls to get_touch_inputs
 //// Capacitive touch state
-static struct {
-  uint8_t mode;
-  uint8_t extended;
-  uint32_t touch1_xy;
-  uint32_t touch4_y;
-  uint32_t touch0_xy;
-  uint32_t tag0_xy;
-  uint32_t tag0;
-  uint32_t tag1_xy;
-  uint32_t tag1;
-  uint32_t tag2_xy;
-  uint32_t tag2;
-  uint32_t tag3_xy;
-  uint32_t tag3;
-  uint32_t tag4_xy;
-  uint32_t tag4;
-  uint32_t touch4_x;
-  uint32_t touch2_xy;
-  uint32_t touch3_xy;
-} ft81x_ctouch;
+struct ft81x_ctouch_t ft81x_ctouch;
 
 //// touch tracker state
-static struct {
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker0;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker1;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker2;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker3;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker4;
-} ft81x_touch;
+struct ft81x_touch_t ft81x_touch;
 
 // Our device config configured for ESP32+FT81X
 // to work around no variable dummy byte and more issues.
@@ -219,25 +185,24 @@ bool ft81x_initGPU() {
     if (count > 100)
       return false;
   };
+
   //ESP_LOGW(TAG, "HWID: 0x%04x", ret);
   // Save our CHIP ID
   ft81x_chip_id = ret;
-
-  // Set the PWM to 0 turn off the backlight
-  ft81x_wr(REG_PWM_DUTY, 0);
 
   // Enable QUAD spi mode if configured
   #if (FT81X_QUADSPI)
     // Enable QAUD spi mode no dummy
     ft81x_wr16(REG_SPI_WIDTH, 0b010);
     ft81x_qio = 1;
-    //ft81x_wr16(REG_SPI_WIDTH, 0b00);
-    //ft81x_qio = 0;
   #else
     // Enable single channel spi mode
-    ft81x_wr16(REG_SPI_WIDTH, 0b0);
+    ft81x_wr16(REG_SPI_WIDTH, 0b000);
     ft81x_qio = 0;
   #endif
+
+  // Set the PWM to 0 turn off the backlight
+  ft81x_wr(REG_PWM_DUTY, 0);
 
   // Reset the command fifo state vars
   ft81x_reset_fifo();
@@ -293,8 +258,9 @@ bool ft81x_initGPU() {
 
   // Setup the FT81X GPIO PINS
   // set bit 7 to OUTPUT enable the display
+  // turn of GPIO power to 10ma for SPI pins
   ft81x_wr16(REG_GPIOX_DIR, 0x8000);
-  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x8000 | 0b1000);
+  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x8000  | (0x1 << 10));
 
   // Enable the pixel clock
   ft81x_wr32(REG_PCLK, 3);
@@ -315,7 +281,6 @@ bool ft81x_initGPU() {
   gpio_set_level(GPIO_NUM_16, 0);
 #endif
 
-
 #if 1 // Test LOAD_IMAGE ON and OFF with a transparent PNG and update when touched
   uint32_t imgptr, widthptr, heightptr;
   uint32_t ptron, ptroff, ptrnext, width, height;
@@ -324,19 +289,12 @@ bool ft81x_initGPU() {
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
 
-  // Load the OFF image
+  // Load the OFF image to the MEDIA FIFO
   //// Start streaming
   ft81x_stream_start();
 
-  //// Load the image at address 0
-  ptroff = 0;
-  ft81x_cmd_loadimage(ptroff, OPT_RGB565 | OPT_NODL);
-
-  //// spool the image to the FT81X
-  ft81x_cSPOOL((uint8_t *)transparent_test_file_off_png, transparent_test_file_off_png_len);
-
-  //// Get the decompressed image properties
-  ft81x_cmd_getprops(&imgptr, &widthptr, &heightptr);
+  //// Configure MEDIA FIFO
+  ft81x_cmd_mediafifo(0x100000UL-0x40000UL, 0x40000UL);
 
   //// Trigger FT81x to read the command buffer
   ft81x_getfree(0);
@@ -347,17 +305,51 @@ bool ft81x_initGPU() {
   //// Wait till the GPU is finished
   ft81x_wait_finish();
 
+  //// stop media fifo
+  ft81x_wr32(REG_MEDIAFIFO_WRITE, 0);
+
+  //// Load the image at address 0
+  ptroff = 0;
+
+  // Load the OFF image
+  //// Start streaming
+  ft81x_stream_start();
+  
+  //// USE MEDIA_FIFO
+  //// Load the image at address transparent_test_file_png_len+1
+  ft81x_cmd_loadimage(ptroff, OPT_RGB565 | OPT_NODL | OPT_MEDIAFIFO);
+
+  //// Get the decompressed image properties
+  ft81x_cmd_getprops(&imgptr, &widthptr, &heightptr);
+
+  //// Trigger FT81x to read the command buffer
+  ft81x_getfree(0);
+
+  //// Finish streaming to command buffer
+  ft81x_stream_stop();
+
+  //// Send the image to the media fifo
+  ft81x_cSPOOL_MF(transparent_test_file_off_png, transparent_test_file_off_png_len);
+
+  //// Wait till the GPU is finished
+  ft81x_wait_finish();
+
   //// Dump results
   ptron = ft81x_rd32(imgptr); // pointer to end of image and start of next free memory
   width = ft81x_rd32(widthptr);
   height = ft81x_rd32(heightptr);
   ESP_LOGW(TAG, "loadimage off: start:0x%04x end: 0x%04x width: 0x%04x height: 0x%04x", ptroff, ptron-1, width, height);
 
-  // Load the ON image
+  // SPI Debugging
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);
+
+  // Load the OFF image
   //// Start streaming
   ft81x_stream_start();
 
-  //// Load the image at address transparent_test_file_png_len+1
+  //// USING CMD BUFFER. Max size is ~4k
+  //// Load the image at address transparent_test_file_png_len+1 using CMD buffer
   ft81x_cmd_loadimage(ptron, OPT_RGB565 | OPT_NODL);
 
   //// spool the image to the FT81X
@@ -379,7 +371,11 @@ bool ft81x_initGPU() {
   ptrnext = ft81x_rd32(imgptr); // pointer to end of image and start of next free memory
   width = ft81x_rd32(widthptr);
   height = ft81x_rd32(heightptr);
-  ESP_LOGW(TAG, "loadimage off: start:0x%04x end: 0x%04x width: 0x%04x height: 0x%04x", ptron, ptrnext-1, width, height);
+  ESP_LOGW(TAG, "loadimage on: start:0x%04x end: 0x%04x width: 0x%04x height: 0x%04x", ptron, ptrnext-1, width, height);
+
+  // SPI Debugging
+  gpio_set_level(GPIO_NUM_16, 1);
+  gpio_set_level(GPIO_NUM_16, 0);
 
   //ft81x_get_touch_inputs();
   //ESP_LOGW(TAG, "ctouch mode: 0x%04x extended: 0x%04x", ft81x_ctouch.mode, ft81x_ctouch.extended);
@@ -397,15 +393,22 @@ bool ft81x_initGPU() {
       // Draw ON/OFF based upon touch
       if (ft81x_ctouch.tag0) {
         ESP_LOGW(TAG, "touched");
-        ft81x_bitmap_source(ptron);
-        ft81x_clear_color_rgb32(0x28e800);
+
+        // Clear the display
+        ft81x_clear_color_rgb32(0x28e800);        
+        ft81x_clear();
+        // Draw the image
+        ft81x_bitmap_source(ptron);        
+        
       } else {
+        // Clear the display
+        ft81x_clear_color_rgb32(0xfdfdfd);        
+        ft81x_clear();
+        // Draw the image
         ft81x_bitmap_source(ptroff);
-        ft81x_clear_color_rgb32(0xfdfdfd);
+        
       }
 
-      // Clear the display
-      ft81x_clear();
 
       // Turn on tagging
       ft81x_tag_mask(1);
@@ -697,9 +700,6 @@ void ft81x_hostcmd(uint8_t command, uint8_t args) {
 
   trans.base.rx_buffer = NULL;
 
-  gpio_set_level(GPIO_NUM_16, 1);
-  gpio_set_level(GPIO_NUM_16, 0);
-
   // start the transaction ISR watches the CS bit
   ft81x_cs(0);
 
@@ -708,10 +708,6 @@ void ft81x_hostcmd(uint8_t command, uint8_t args) {
 
   // end the transaction
   ft81x_cs(1);
-
-  gpio_set_level(GPIO_NUM_16, 1);
-  gpio_set_level(GPIO_NUM_16, 0);
-
 }
 
 /*
@@ -777,7 +773,7 @@ uint16_t ft81x_rd16(uint32_t addr)
   memset(&trans, 0, sizeof(trans));
 
   // allocate memory for our return data
-  char *recvbuf=heap_caps_malloc(2, MALLOC_CAP_DMA);
+  char *recvbuf=heap_caps_malloc(4, MALLOC_CAP_DMA);
 
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
@@ -788,15 +784,16 @@ uint16_t ft81x_rd16(uint32_t addr)
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
 
-  // fake dummy byte shift left 8
-  trans.address_bits = 32;
-  trans.base.addr = addr << 8;
+  // Set the address
+  trans.address_bits = 24;
+  trans.base.addr = addr;
 
-  trans.base.length = 16;
-  trans.base.rxlength = 16;
+  // 1 byte is our dummy byte we will throw it away later
+  trans.base.length = 24;
+  trans.base.rxlength = 24;
 
   // point to our RX buffer.
-  trans.base.rx_buffer = recvbuf; // RX buffer
+  trans.base.rx_buffer = recvbuf;
 
   // start the transaction ISR watches CS bit
   ft81x_cs(0);
@@ -804,8 +801,8 @@ uint16_t ft81x_rd16(uint32_t addr)
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data
-  uint16_t ret = *((uint16_t *)recvbuf);
+  // grab our return data skip dummy byte
+  uint16_t ret = *((uint16_t *)&recvbuf[1]);
 
   // end the transaction
   ft81x_cs(1);
@@ -828,7 +825,7 @@ uint32_t ft81x_rd32(uint32_t addr)
   memset(&trans, 0, sizeof(trans));
 
   // allocate memory for our return data
-  char *recvbuf=heap_caps_malloc(4, MALLOC_CAP_DMA);
+  char *recvbuf=heap_caps_malloc(5, MALLOC_CAP_DMA);
 
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
@@ -839,15 +836,16 @@ uint32_t ft81x_rd32(uint32_t addr)
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
 
-  // fake dummy byte shift left 8
-  trans.address_bits = 32;
-  trans.base.addr = addr << 8;
+  // Set the address
+  trans.address_bits = 24;
+  trans.base.addr = addr;
 
-  trans.base.length = 32;
-  trans.base.rxlength = 32;
+  // 1 byte is our dummy byte we will throw it away later
+  trans.base.length = 40;
+  trans.base.rxlength = 40;
 
   // point to our RX buffer.
-  trans.base.rx_buffer = recvbuf; // RX buffer
+  trans.base.rx_buffer = recvbuf;
 
   // start the transaction ISR watches CS bit
   ft81x_cs(0);
@@ -855,8 +853,8 @@ uint32_t ft81x_rd32(uint32_t addr)
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data
-  uint32_t ret = *((uint32_t *)recvbuf);
+  // grab our return data skip dummy byte
+  uint32_t ret = *((uint32_t *)&recvbuf[1]);
 
   // end the transaction
   ft81x_cs(1);
@@ -892,8 +890,8 @@ void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
   spi_transaction_ext_t trans;
   memset(&trans, 0, sizeof(trans));
 
-  // allocate memory for our return data
-  char *recvbuf=heap_caps_malloc(len, MALLOC_CAP_DMA);
+  // allocate memory for our return data and dummy byte
+  char *recvbuf=heap_caps_malloc(len+1, MALLOC_CAP_DMA);
 
   // set trans options.
   trans.base.flags = SPI_TRANS_VARIABLE_ADDR;
@@ -904,12 +902,14 @@ void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
     trans.base.flags |= SPI_TRANS_MODE_QIO;
   }
 
-  // fake dummy byte shift left 8
-  trans.address_bits = 32;
-  trans.base.addr = addr << 8;
+  // Set the address
+  trans.address_bits = 24;
+  trans.base.addr = addr;
 
-  trans.base.length = 32;
-  trans.base.rxlength = len * 8;
+  // 1 byte is our dummy byte we will throw it away later
+  uint32_t lenN = (len * 8) + 8;
+  trans.base.length = lenN;
+  trans.base.rxlength = lenN;
 
   // point to our RX buffer.
   trans.base.rx_buffer = recvbuf; // RX buffer
@@ -920,8 +920,8 @@ void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len) {
   // transmit our transaction to the ISR
   spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
 
-  // grab our return data
-  memcpy(results, recvbuf, len);
+  // grab our return data skip dummy byte
+  memcpy(results, &recvbuf[1], len);
 
   // end the transaction
   ft81x_cs(1);
@@ -1040,6 +1040,173 @@ void ft81x_wr32(uint32_t addr, uint32_t word) {
   // end the transaction
   ft81x_cs(1); // inactive CS
 
+}
+
+/*
+ * Write 24 bit address leave CS open for data to be written
+ * A total of 3 bytes will be on the SPI BUS.
+ */
+void ft81x_wrA(uint32_t addr) {
+  // setup trans memory
+  spi_transaction_ext_t trans;
+  memset(&trans, 0, sizeof(trans));
+
+  // set trans options.
+  if (ft81x_qio) {
+    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
+    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
+    // Set this transaction to QIO
+    trans.base.flags |= SPI_TRANS_MODE_QIO;
+  }
+
+  // set write bit if rw=1
+  addr |= 0x800000;
+  addr = SPI_REARRANGE_DATA(addr, 24);
+
+  trans.base.length = 24;
+  trans.base.tx_buffer = &addr;
+
+  // start the transaction ISR watches CS bit
+  ft81x_cs(0); // active CS
+
+  // transmit our transaction to the ISR
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
+  
+}
+
+/*
+ * Write bytes to the spi port no tracking.
+ */
+void ft81x_wrN(uint8_t *buffer, uint8_t size) {
+  
+  // setup trans memory
+  spi_transaction_ext_t trans;
+  memset(&trans, 0, sizeof(trans));
+
+  // set trans options.
+  if (ft81x_qio) {
+    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
+    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
+    // Set this transaction to QIO
+    trans.base.flags |= SPI_TRANS_MODE_QIO;
+  }
+
+  trans.base.length = size * 8;
+  trans.base.tx_buffer = buffer;
+
+  // transmit our transaction to the ISR
+  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
+}
+
+void ft81x_wrE(uint32_t addr) {
+  // end the transaction
+  ft81x_cs(1); // inactive CS  
+}
+
+/*
+ * Spool a large block of memory in chunks into the FT81X
+ * using the MEDIA FIFO registers. Currently the max chunk size
+ * on ESP32 with DMA of 0 is 32 bytes.
+ *
+ * If the size is > the available space this routine will block.
+ * To avoid blocking check free space before calling this routine.
+ */
+void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
+  uint32_t fullness;
+  size_t rds;
+  size_t ts;
+  uint8_t stopped = 1; // Stopped at startup
+  size_t written = 0;
+  
+  // Get the read pointer where the GPU is working currently
+  uint32_t mf_rp = ft81x_rd32(REG_MEDIAFIFO_READ);
+
+  // Calculate how full our fifo is based upon our read/write pointers
+  fullness = (mf_wp - mf_rp) & (mf_size - 1);
+
+  // Blocking! Keep going until all the data is sent. 
+  do {
+
+    // Wait till we have enough room to send a whole buffer
+    if ( !(fullness < (mf_size - CHUNKSIZE)) ) {
+
+      // Release the SPI bus
+      ft81x_stream_stop(); stopped = 1;
+      
+      // Did we write anything? If so tell the FT813
+      if (written) {
+        ft81x_wr32(REG_MEDIAFIFO_WRITE, mf_wp);
+        written = 0;
+      }
+
+      // sleep a little let other processes go.
+      vTaskDelay(1 / portTICK_PERIOD_MS);
+
+      // Get the read pointer where the GPU is working currently
+      // consuming bytes.
+      mf_rp = ft81x_rd32(REG_MEDIAFIFO_READ);
+
+      // Calculate how full our fifo is based upon our read/write pointers
+      fullness = (mf_wp - mf_rp) & (mf_size - 1);
+      
+      continue;
+    }
+
+    // resume streaming data if needed
+    if (stopped) {
+      // Start streaming to our fifo starting with our address
+      // same as ft81x_stream_start() but different address area
+      // and no auto wrapping :(
+      ft81x_wrA(mf_base + mf_wp); stopped = 0;
+    }
+
+    // NOTE: AFAIK the FT81X MEDIA FIFO engine does not do automatic wrapping.
+    // Do not write past end of buffer!
+    // This is not in the documentation for the FIFO commands AFAIK.
+    // FIXME: better description/docs
+    rds = (mf_size - mf_wp);
+    if (rds >= CHUNKSIZE) {
+      rds = CHUNKSIZE;
+    }
+
+    // default write size to chunk size or enough to max the FIFO
+    ts = rds;
+
+    // if we have less than a chunk then update our write size
+    if (size < CHUNKSIZE) {
+      ts = size;
+    }
+
+    //// write the block to the FT81X
+    ft81x_wrN((uint8_t *)buffer, ts);
+
+    // increment the pointers/counters
+    buffer+=ts;
+    mf_wp+=ts;
+    fullness+=ts;
+    size-=ts;
+    written+=ts;
+
+    // If true it must have reached the end of the fifo buffer.
+    // Reset state by forcing an overflow event above.
+    if ( rds != CHUNKSIZE ) {
+        fullness = mf_size;
+    }
+    
+  } while (size);
+
+  // Release the SPI bus
+  ft81x_stream_stop(); stopped = 1;
+  
+  // Did we write anything? If so tell the FT813
+  if (written) {
+    // SPI Debugging
+    gpio_set_level(GPIO_NUM_16, 1);
+    gpio_set_level(GPIO_NUM_16, 0);
+    
+    ft81x_wr32(REG_MEDIAFIFO_WRITE, mf_wp);
+    written = 0;
+  }
 }
 
 /*
@@ -1271,11 +1438,11 @@ void ft81x_wait_finish() {
 #endif
   uint16_t rp;
   ft81x_wp &= 0xffc;
+  #if 0
+    ESP_LOGW(TAG, "waitfin: twp:0x%04x wp:0x%04x rp:0x%04x", twp, ft81x_wp, ft81x_rp());
+  #endif  
   while ( ((rp=ft81x_rp()) != ft81x_wp) ) {
   }
-#if 0
-  ESP_LOGW(TAG, "waitfin: twp:0x%04x wp:0x%04x rp:0x%04x", twp, ft81x_wp, rp);
-#endif
 }
 
 /*
@@ -1991,7 +2158,7 @@ void ft81x_cmd_regread(uint32_t ptr, uint32_t* result) {
  * 5.17 CMD_MEMWRITE
  * Write bytes into memory
  */
-void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num, void* mem) {
+void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num) {
   // check that we have enough space then send command
   ft81x_checkfree(12);
   ft81x_cFFFFFF(0x1a);
@@ -2028,11 +2195,15 @@ void ft81x_cmd_loadimage(uint32_t ptr, uint32_t options) {
  * set up a streaming media FIFO in RAM_G
  * SM20180828:QA:PASS
  */
-void ft81x_cmd_mediafifo(uint32_t ptr, uint32_t size) {
+void ft81x_cmd_mediafifo(uint32_t base, uint32_t size) {
+  mf_wp = 0;
+  mf_size = size;
+  mf_base = base;
+  
   // check that we have enough space then send command
   ft81x_checkfree(12);
   ft81x_cFFFFFF(0x39);
-  ft81x_cI(ptr);
+  ft81x_cI(base);
   ft81x_cI(size);
 }
 
@@ -2042,8 +2213,9 @@ void ft81x_cmd_mediafifo(uint32_t ptr, uint32_t size) {
  */
 void ft81x_cmd_playvideo(uint32_t options) {
   // check that we have enough space then send command
-  ft81x_checkfree(4);
-  ft81x_cFFFFFF(0x40);
+  ft81x_checkfree(8);
+  ft81x_cFFFFFF(0x3a);
+  ft81x_cI(options);
 }
 
 /*

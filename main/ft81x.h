@@ -38,7 +38,7 @@
 
 // General settings/utils
 //// 5-8mhz is the best I see so far
-#define FT81X_SPI_SPEED 1000000
+#define FT81X_SPI_SPEED 4000000
 
 //// QUAD SPI is not stable yet. Noise or ...?
 //// Enable QUAD spi mode on ESP32 and FT81X
@@ -256,6 +256,9 @@
 #define REG_TRACKER_3        0x30900cUL // 32RO Track and TAG value 3
 #define REG_TRACKER_4        0x309010UL // 32RO Track and TAG value 4
 
+#define REG_MEDIAFIFO_READ   0x309014UL // 32RW FIFO Read pointer
+#define REG_MEDIAFIFO_WRITE  0x309018UL // 32RW FIFO Write pointer
+
 // COMMANDS
 #define CMD_ACTIVE         0x00   // Switch from standby/sleep/pwrdown to active mode
 #define CMD_STANDBY        0x41   // Put FT81X into standby mode
@@ -273,6 +276,53 @@
 /*
  * Types
  */
+
+// FT813 touch screen state loaded by calls to get_touch_inputs
+//// Capacitive touch state
+struct ft81x_ctouch_t {
+ uint8_t mode;
+ uint8_t extended;
+ uint32_t touch1_xy;
+ uint32_t touch4_y;
+ uint32_t touch0_xy;
+ uint32_t tag0_xy;
+ uint32_t tag0;
+ uint32_t tag1_xy;
+ uint32_t tag1;
+ uint32_t tag2_xy;
+ uint32_t tag2;
+ uint32_t tag3_xy;
+ uint32_t tag3;
+ uint32_t tag4_xy;
+ uint32_t tag4;
+ uint32_t touch4_x;
+ uint32_t touch2_xy;
+ uint32_t touch3_xy;
+};
+
+//// touch tracker state
+struct  ft81x_touch_t {
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker0;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker1;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker2;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker3;
+  struct {
+    uint16_t tag_value;
+    uint16_t track_value;
+  } tracker4;
+};
 
 /*
  * Prototypes
@@ -308,6 +358,18 @@ uint32_t ft81x_rd32(uint32_t addr);
 // Send a 16 bit address + dummy and read the N byte response in chunks
 void ft81x_rdN(uint32_t addr, uint8_t *results, int8_t len);
 void ft81x_rdn(uint32_t addr, uint8_t *results, int8_t len);
+
+// Address write op start. Send a 16 bit address only leave CS open for more data
+void ft81x_wrA(uint32_t addr);
+
+// Spool a large block of memory in chunks into the FT81X tracking using MEDIA FIFO state
+void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size);
+
+// Send a block of data to the spi device
+void ft81x_wrN(uint8_t *buffer, uint8_t size);
+
+// End address write operation
+void ft81x_wrE();
 
 // Send a 16 bit address and write 8 bits of data
 void ft81x_wr(uint32_t addr, uint8_t byte);
@@ -527,19 +589,19 @@ void ft81x_cmd_append(uint32_t ptr, uint32_t num);
 void ft81x_cmd_regread(uint32_t ptr, uint32_t *result);
 
 // 5.17 CMD_MEMWRITE - Write bytes into memory
-void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num, void *mem);
+void ft81x_cmd_memwrite(uint32_t ptr, uint32_t num);
 
 // 5.18 CMD_INFLATE - Decompress data into memory
-void ft81x_cmd_inflate(uint32_t ptr, uint32_t num, void* mem);
+void ft81x_cmd_inflate(uint32_t ptr);
 
 // 5.19 CMD_LOADIMAGE - Load a JPEG or PNG image
 void ft81x_cmd_loadimage(uint32_t ptr, uint32_t options);
 
 // 5.20 CMD_MEDIAFIFO - set up a streaming media FIFO in RAM_G
-void ft81x_cmd_mediafifo(uint32_t ptr, uint32_t size);
+void ft81x_cmd_mediafifo(uint32_t base, uint32_t size);
 
 // 5.21 CMD_PLAYVIDEO - Video playback
-void ft81x_cmd_playvideo(uint32_t options, uint8_t *data);
+void ft81x_cmd_playvideo(uint32_t options);
 
 // 5.22 CMD_VIDEOSTART - Initialize the AVI video decoder
 void ft81x_cmd_videostart();
