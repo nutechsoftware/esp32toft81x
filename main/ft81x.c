@@ -66,7 +66,7 @@ uint16_t ft81x_width = 0;
 uint16_t ft81x_height = 0;
 
 // MEDIA FIFO state vars
-uint16_t mf_wp = 0;
+uint32_t mf_wp = 0;
 uint32_t mf_size = 0;
 uint32_t mf_base = 0;
 
@@ -1123,7 +1123,9 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
 
   // Calculate how full our fifo is based upon our read/write pointers
   fullness = (mf_wp - mf_rp) & (mf_size - 1);
-
+#if 0
+  ESP_LOGI(TAG, "rp1 0x%08x wp 0x%08x full 0x%08x", mf_rp, mf_wp, fullness);
+#endif
   // Blocking! Keep going until all the data is sent. 
   do {
 
@@ -1192,6 +1194,15 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
     if ( rds != CHUNKSIZE ) {
         fullness = mf_size;
     }
+
+#if 0    
+    ESP_LOGI(TAG, "rp2 0x%08x wp 0x%08x full 0x%08x", mf_rp, mf_wp, fullness);
+    // sleep a little let other processes go.
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+#endif
+
+    // loop around if we overflow the fifo.
+    mf_wp&=(mf_size-1);
     
   } while (size);
 
@@ -1200,10 +1211,6 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
   
   // Did we write anything? If so tell the FT813
   if (written) {
-    // SPI Debugging
-    gpio_set_level(GPIO_NUM_16, 1);
-    gpio_set_level(GPIO_NUM_16, 0);
-    
     ft81x_wr32(REG_MEDIAFIFO_WRITE, mf_wp);
     written = 0;
   }
