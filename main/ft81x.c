@@ -1174,8 +1174,8 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
     // default write size to chunk size or enough to max the FIFO
     ts = rds;
 
-    // if we have less than a chunk then update our write size
-    if (size < CHUNKSIZE) {
+    // if we have less to send than we can then update transmit size
+    if (size < ts) {
       ts = size;
     }
 
