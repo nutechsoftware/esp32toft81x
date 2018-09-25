@@ -1113,8 +1113,7 @@ void ft81x_wrE(uint32_t addr) {
  */
 void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
   uint32_t fullness;
-  size_t rds;
-  size_t ts;
+  size_t rds, ts;
   uint8_t stopped = 1; // Stopped at startup
   size_t written = 0;
   
@@ -1129,7 +1128,7 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
   // Blocking! Keep going until all the data is sent. 
   do {
 
-    // Wait till we have enough room to send a whole buffer
+    // Wait till we have enough room to send some data
     if ( !(fullness < (mf_size - CHUNKSIZE)) ) {
 
       // Release the SPI bus
@@ -1162,16 +1161,13 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
       ft81x_wrA(mf_base + mf_wp); stopped = 0;
     }
 
-    // NOTE: AFAIK the FT81X MEDIA FIFO engine does not do automatic wrapping.
-    // Do not write past end of buffer!
-    // This is not in the documentation for the FIFO commands AFAIK.
-    // FIXME: better description/docs
+    // write up to the very end of the fifo buffer
     rds = (mf_size - mf_wp);
-    if (rds >= CHUNKSIZE) {
+    if (rds > CHUNKSIZE) {
       rds = CHUNKSIZE;
     }
 
-    // default write size to chunk size or enough to max the FIFO
+    // default write size to chunk size or enough for the end of the fifo
     ts = rds;
 
     // if we have less to send than we can then update transmit size
@@ -1179,7 +1175,7 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
       ts = size;
     }
 
-    //// write the block to the FT81X
+    // write the block to the FT81X
     ft81x_wrN((uint8_t *)buffer, ts);
 
     // increment the pointers/counters
@@ -1189,13 +1185,7 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
     size-=ts;
     written+=ts;
 
-    // If true it must have reached the end of the fifo buffer.
-    // Reset state by forcing an overflow event above.
-    if ( rds != CHUNKSIZE ) {
-        fullness = mf_size;
-    }
-
-#if 0    
+#if 0
     ESP_LOGI(TAG, "rp2 0x%08x wp 0x%08x full 0x%08x", mf_rp, mf_wp, fullness);
     // sleep a little let other processes go.
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -1203,6 +1193,9 @@ void ft81x_cSPOOL_MF(uint8_t *buffer, int32_t size) {
 
     // loop around if we overflow the fifo.
     mf_wp&=(mf_size-1);
+    
+    // force flush if we reached the end of the fifo buffer
+    if(!mf_wp) fullness =- mf_size;
     
   } while (size);
 

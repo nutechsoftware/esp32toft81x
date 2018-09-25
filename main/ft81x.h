@@ -37,7 +37,7 @@
  */
 
 // General settings/utils
-//// 5-8mhz is the best I see so far
+//// For breadboard use 4Mhz or less
 #define FT81X_SPI_SPEED 4000000
 
 //// QUAD SPI is not stable yet. Noise or ...?
