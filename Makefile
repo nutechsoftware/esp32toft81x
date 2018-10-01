@@ -3,7 +3,7 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := hello-world
+PROJECT_NAME := esp32toft81x
 
 include $(IDF_PATH)/make/project.mk
 

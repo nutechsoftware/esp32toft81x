@@ -138,6 +138,11 @@
 #define DECR                  4
 #define INVERT                5
 
+// Sound stream types
+#define LINEAR_SAMPLES       0
+#define ULAW_SAMPLES         1
+#define ADPCM_SAMPLES        2
+
 // Table 4-15 Sound Effect
 #define SILENCE            0x00
 #define SQUAREWAVE         0x01
@@ -216,13 +221,21 @@
 #define REG_VOL_PB           0x302080UL //  8RW Playback volume of file/stream
 #define REG_VOL_SOUND        0x302084UL //  8RW Playback volume of synthesizer
 #define REG_SOUND            0x302088UL // 16RW Select synthesized sound effect
+#define REG_PLAY             0x30208cUL //  1RW Play ON/OFF
 
 #define REG_GPIO_DIR         0x302090UL //  8RW Legacy GPIO pin direction 0=In 1=Out
 #define REG_GPIO             0x302094UL //  8RW Legacy GPIO pin direction
 #define REG_GPIOX_DIR        0x302098UL // 16RW Extended GPIO pin direction 0=In 1=Out
 #define REG_GPIOX            0x30209cUL // 16RW Extended GPIO read/write
-#define REG_PWM_DUTY         0x3020d4UL //  8RW Back-light PWM duty cycle
+#define REG_PLAYBACK_START   0x3020b4UL // 20RW Start of audio data in G_RAM
+#define REG_PLAYBACK_LENGTH  0x3020b8UL // 20RW Length of audio data in G_RAM to play
+#define REG_PLAYBACK_FREQ    0x3020c0UL // 16RO The sampling fequency of audio playback data. Units is in Hz.
+#define REG_PLAYBACK_FORMAT  0x3020c4UL //  2RW The format of the audio data in RAM_G
+#define REG_PLAYBACK_LOOP    0x3020c8UL //  1RW Loop back to start if 1
+#define REG_PLAYBACK_PLAY    0x3020ccUL //  1RW Start when 1 is written
 
+#define REG_PWM_DUTY         0x3020d4UL //  8RW Back-light PWM duty cycle
+#define REG_PWM_HZ           0x3020d0UL // 14RW PWM output frequencey 250Hz-10000Hz
 #define REG_CMD_READ         0x3020f8UL // 12RW Command buffer read pointer
 #define REG_CMD_WRITE        0x3020fcUL // 12RO Command buffer write pointer
 

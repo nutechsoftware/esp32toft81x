@@ -267,6 +267,34 @@ bool ft81x_initGPU() {
 
   // Sleep a little
   vTaskDelay(100 / portTICK_PERIOD_MS);
+  
+#if 0 // SOUND test
+  // Set volume to MAX
+  ft81x_wr(REG_VOL_SOUND,0xff);
+
+  for(int a = 0; a < 4; a++) {
+    
+    // Turn on the audio amp connected to GPIO3
+    ft81x_wr16(REG_GPIOX_DIR, ft81x_rd16(REG_GPIOX_DIR) | (0x1 << 3));
+    ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | (0x1 << 3));
+    
+    ft81x_wr16(REG_SOUND,(0x3C<< 8) | 0x52);
+    ft81x_wr(REG_PLAY, 1);    
+    //// Wait till the sound is finished
+    while(ft81x_rd(REG_PLAY)) {
+      // Sleep a little
+      vTaskDelay(50 / portTICK_PERIOD_MS);      
+    }
+
+    // Turn off the audio amp connected to GPIO3
+    ft81x_wr16(REG_GPIOX_DIR, ft81x_rd16(REG_GPIOX_DIR) & ~(0x1 << 3));
+    ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) & ~(0x1 << 3));
+    
+  }
+  // Set volume to MUTE
+  ft81x_wr(REG_VOL_SOUND,0);
+    
+#endif
 
 #if 0 // Display the built in FTDI logo animation and then calibrate
   // SPI Debugging
@@ -281,10 +309,12 @@ bool ft81x_initGPU() {
   gpio_set_level(GPIO_NUM_16, 0);
 #endif
 
-#if 1 // Test LOAD_IMAGE ON and OFF with a transparent PNG and update when touched
+#if 0 // Test LOAD_IMAGE ON and OFF with a transparent PNG and update when touched
   uint32_t imgptr, widthptr, heightptr;
   uint32_t ptron, ptroff, ptrnext, width, height;
-
+  uint32_t lasttag = 0;
+  uint8_t  soundplaying = 0;
+  
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
@@ -381,7 +411,46 @@ bool ft81x_initGPU() {
   //ESP_LOGW(TAG, "ctouch mode: 0x%04x extended: 0x%04x", ft81x_ctouch.mode, ft81x_ctouch.extended);
 
   // Capture input events and update the image if touched
-  for (int x=0; x<300; x++) {
+  uint8_t sound = 0x40;
+  for (int x=0; x<1000; x++) {
+
+#if 1 // TEST SOUND TOUCH FEEDBACK
+      if(ft81x_ctouch.tag0) {        
+        if(ft81x_ctouch.tag0 != lasttag) {
+          lasttag = ft81x_ctouch.tag0;#if 1
+          // Max volume
+          ft81x_wr(REG_VOL_SOUND,0xff);
+          // Turn ON the AMP using enable pin connected to GPIO3
+          ft81x_wr16(REG_GPIOX_DIR, ft81x_rd16(REG_GPIOX_DIR) | (0x1 << 3));
+          ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | (0x1 << 3));
+
+          ft81x_wr16(REG_SOUND,(0x4C<< 8) | sound++);
+          ft81x_wr(REG_PLAY, 1);
+
+          //ft81x_wr(REG_VOL_PB,0xFF);//configure audio playback volume
+          //ft81x_wr32(REG_PLAYBACK_START,0);//configure audio buffer starting address
+          //ft81x_wr32(REG_PLAYBACK_LENGTH,100*1024);//configure audio buffer length
+          //ft81x_wr16(REG_PLAYBACK_FREQ,44100);//configure audio sampling frequency
+          //ft81x_wr(REG_PLAYBACK_FORMAT,ULAW_SAMPLES);//configure audio format
+          //ft81x_wr(REG_PLAYBACK_LOOP,0);//configure once or continuous playback
+          //ft81x_wr(REG_PLAYBACK_PLAY,1);//start the audio playback
+          
+          soundplaying = 1;
+          if(sound>0x58)
+            sound = 0x40;
+        }
+      } else 
+        lasttag = 0;
+      
+      if(soundplaying && !ft81x_rd(REG_PLAY)) {
+          soundplaying = 0;
+          // Mute
+          ft81x_wr(REG_VOL_SOUND,0);
+          // Turn OFF the AMP using enable pin connected to GPIO3
+          ft81x_wr16(REG_GPIOX_DIR, ft81x_rd16(REG_GPIOX_DIR) & ~(0x1 << 3));
+          ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) & ~(0x1 << 3));        
+      }
+#endif
 
       // Start streaming
       ft81x_stream_start();
