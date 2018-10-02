@@ -29,7 +29,7 @@ foo@bar:~$ make menuconfig
   - https://esp-idf.readthedocs.io/en/latest/get-started/index.html
 - Compile and program the ESP32 Thing
 ```console
-foo@bar:~$ make flash
+foo@bar:~$ make test; make flash
 ```
 
 ## Notes

@@ -2,7 +2,7 @@
  *  @file    ft81x.h
  *  @author  Sean Mathews <coder@f34r.com>
  *  @date    08/01/2018
- *  @version 1.0
+ *  @version 1.1
  *
  *  @brief API to communicate with a FT81X chip from a ESP32 uP
  *
