@@ -252,17 +252,13 @@ bool ft81x_initGPU() {
   vTaskDelay(100 / portTICK_PERIOD_MS);
 #endif
 
-  // Enable the backlight
-  ft81x_wr(REG_PWM_DUTY, 12);
+  // Disable the backlight
+  ft81x_wr(REG_PWM_DUTY, 0);
 
   // Setup the FT81X GPIO PINS
-  // set bit 7 to OUTPUT enable the display
   // turn of GPIO power to 10ma for SPI pins
   ft81x_wr16(REG_GPIOX_DIR, 0x8000);
-  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x8000  | (0x1 << 10));
-
-  // Enable the pixel clock
-  ft81x_wr32(REG_PCLK, 3);
+  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | (0x1 << 10));
 
   // Sleep a little
   vTaskDelay(100 / portTICK_PERIOD_MS);
@@ -558,6 +554,7 @@ bool ft81x_initGPU() {
 #endif
 
 #if 0 // Draw a gray screen and write Hello World, 123, button etc.
+  ft81x_wr(REG_PWM_DUTY, 8);
   // SPI Debugging
   gpio_set_level(GPIO_NUM_16, 1);
   gpio_set_level(GPIO_NUM_16, 0);
@@ -716,6 +713,35 @@ bool ft81x_initGPU() {
 
   return true;
 }
+
+/*
+ * Turn off the display entering low power mode
+ */
+void ft81x_sleep() {
+  // Disable the pixel clock
+  ft81x_wr32(REG_PCLK, 0);
+
+  // Set PWM to 0
+  ft81x_wr(REG_PWM_DUTY, 0);
+
+  // Turn the display off
+  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x7fff);
+}
+
+/*
+ * Wake the display up and set pwm level
+ */
+void ft81x_wake(uint8_t pwm) {
+  // Enable the pixel clock
+  ft81x_wr32(REG_PCLK, 3);
+
+  // Set PWM to pwm
+  ft81x_wr(REG_PWM_DUTY, pwm);
+
+  // Turn the display on
+  ft81x_wr16(REG_GPIOX, ft81x_rd16(REG_GPIOX) | 0x8000);
+}
+
 
 /*
  * Initialize our command buffer pointer state vars

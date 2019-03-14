@@ -347,6 +347,12 @@ bool ft81x_initSPI();
 // Initialize FT81X GPU
 bool ft81x_initGPU();
 
+// Put the display to sleep low power mode
+void ft81x_sleep();
+
+// Wake the display from sleep low power mode
+void ft81x_wake(uint8_t pwm);
+
 // reset the fifo state vars
 void ft81x_reset_fifo();
 
