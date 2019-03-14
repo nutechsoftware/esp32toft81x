@@ -72,10 +72,12 @@ uint32_t mf_base = 0;
 
 // FT813 touch screen state loaded by calls to get_touch_inputs
 //// Capacitive touch state
-struct ft81x_ctouch_t ft81x_ctouch;
+
+//struct ft81x_ctouch_t ft81x_ctouch;
 
 //// touch tracker state
-struct ft81x_touch_t ft81x_touch;
+struct ft81x_touch_tracker_t ft81x_touch_tracker[FT81X_TOUCH_POINTS];
+struct ft81x_touch_input_t  ft81x_touch_input[FT81X_TOUCH_POINTS];
 
 // Our device config configured for ESP32+FT81X
 // to work around no variable dummy byte and more issues.
@@ -403,16 +405,16 @@ bool ft81x_initGPU() {
   gpio_set_level(GPIO_NUM_16, 0);
 
   //ft81x_get_touch_inputs();
-  //ESP_LOGW(TAG, "ctouch mode: 0x%04x extended: 0x%04x", ft81x_ctouch.mode, ft81x_ctouch.extended);
+  //ESP_LOGW(TAG, "ctouch mode: 0x%04x multi-touch: %s", ft81x_touch_mode(), ft81x_multi_touch_enabled() ? "true" : "false");
 
   // Capture input events and update the image if touched
   uint8_t sound = 0x40;
   for (int x=0; x<1000; x++) {
 
 #if 1 // TEST SOUND TOUCH FEEDBACK
-      if(ft81x_ctouch.tag0) {        
-        if(ft81x_ctouch.tag0 != lasttag) {
-          lasttag = ft81x_ctouch.tag0;#if 1
+      if(ft81x_touch_input[0].tag) {
+        if(ft81x_touch_input[0].tag != lasttag) {
+          lasttag = ft81x_touch_input[0].tag;#if 1
           // Max volume
           ft81x_wr(REG_VOL_SOUND,0xff);
           // Turn ON the AMP using enable pin connected to GPIO3
@@ -455,7 +457,7 @@ bool ft81x_initGPU() {
       ft81x_cmd_swap();     // Set AUTO swap at end of display list
 
       // Draw ON/OFF based upon touch
-      if (ft81x_ctouch.tag0) {
+      if (ft81x_touch_input[0].tag) {
         ESP_LOGW(TAG, "touched");
 
         // Clear the display
@@ -503,12 +505,12 @@ bool ft81x_initGPU() {
       //// Wait till the GPU is finished
       ft81x_wait_finish();
 
-     // download the display touch memory into ft81x_touch
+     // download the display touch memory into ft81x_touch_tracker
      ft81x_get_touch_inputs();
 #if 0
-     ESP_LOGW(TAG, "tag0: %i xy0: 0x%08x", ft81x_ctouch.tag0, ft81x_ctouch.tag0_xy);
+     ESP_LOGW(TAG, "tag0: %i xy0: 0x%04x,0x%04x", ft81x_touch_input[0].tag, ft81x_touch_input[0].tag_x, ft81x_touch_input[0].tag_y);
      // multitouch
-     // ESP_LOGW(TAG, "tag1: %i xy0: 0x%08x", ft81x_ctouch.tag1, ft81x_ctouch.tag1_xy);
+     // ESP_LOGW(TAG, "tag1: %i xy0: 0x%04x,0x%04x", ft81x_touch_input[1].tag, ft81x_touch_input[1].tag_x, ft81x_touch_input[1].tag_y);
 #endif
      // Sleep
      vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -564,7 +566,7 @@ bool ft81x_initGPU() {
       // Sleep
       vTaskDelay(200 / portTICK_PERIOD_MS);
 
-      // download the display touch memory into ft81x_touch
+      // download the display touch memory into ft81x_touch_tracker
       ft81x_get_touch_inputs();
 
       ft81x_stream_start(); // Start streaming
@@ -583,10 +585,10 @@ bool ft81x_initGPU() {
       ft81x_cmd_text(240, 300, 30, OPT_CENTERY, "Hello World");
 
       ft81x_cmd_text(130, 200, 30, OPT_RIGHTX, "TAG");
-      ft81x_cmd_number(140, 200, 30, 0, ft81x_touch.tracker0.tag_value);
+      ft81x_cmd_number(140, 200, 30, 0, ft81x_touch_tracker[0].tag);
 
       ft81x_cmd_text(130, 230, 30, OPT_RIGHTX, "VALUE");
-      ft81x_cmd_number(140, 230, 30, 0, ft81x_touch.tracker0.track_value * 100 / 65535);
+      ft81x_cmd_number(140, 230, 30, 0, ft81x_touch_tracker[0].value * 100 / FT81X_TRACKER_UNITS);
 
       ft81x_bgcolor_rgb32(0x007f7f);
       ft81x_cmd_clock(730,80,50,0,12,1,2,4);
@@ -1539,35 +1541,97 @@ void ft81x_wait_finish() {
   }
 }
 
+void ft81x_multi_touch_enable(
+	bool enable
+)
+{
+	ft81x_wr(REG_CTOUCH_EXTENDED, !enable); // Turn on=0/(off=1) assume little-endian
+}
+
+bool ft81x_multi_touch_enabled() {
+	return !(ft81x_rd(REG_CTOUCH_EXTENDED) & 0x01);
+}
+
+uint8_t ft81x_touch_mode() {
+	return ft81x_rd(REG_CTOUCH_MODE) & 0x03;
+}
+
 /*
  * Read the FT813 tracker and ctouch registers
  * and update our global touch state structure
  */
 void ft81x_get_touch_inputs() {
+	// read in the tracker memory to our local structure
+	ft81x_rdN(REG_TRACKER, (uint8_t *)&ft81x_touch_tracker, sizeof(ft81x_touch_tracker));
 
-  // read in the tracker memory to our local structure
-  ft81x_rdN(REG_TRACKER, (uint8_t *)&ft81x_touch, sizeof(ft81x_touch));
+	// Read in the ctouch registers depending on multitouch mode some or all.
+	if (ft81x_multi_touch_enabled()) {
+		// Read in our all ctouch registers. Most are continuous but the last 3 are not :(
+		// If we are in single touch mode then we only need a few registers.
+		struct {
+			uint32_t touch1_xy;
+			uint32_t touch4_y;
+			uint32_t touch0_xy;
+			uint32_t tag0_xy;
+			uint32_t tag0;
+			uint32_t tag1_xy;
+			uint32_t tag1;
+			uint32_t tag2_xy;
+			uint32_t tag2;
+			uint32_t tag3_xy;
+			uint32_t tag3;
+			uint32_t tag4_xy;
+			uint32_t tag4;
+		} ft81x_ctouch;
+		ft81x_rdN(REG_CTOUCH_TOUCH1_XY, (uint8_t *)&ft81x_ctouch, sizeof(ft81x_ctouch));
+		ft81x_touch_input[0].tag = ft81x_ctouch.tag0;
+		ft81x_touch_input[0].tag_x = ft81x_ctouch.tag0_xy >> 16;
+		ft81x_touch_input[0].tag_y = ft81x_ctouch.tag0_xy & 0xffff;
+		ft81x_touch_input[0].display_x = (int16_t)(ft81x_ctouch.touch0_xy >> 16);
+		ft81x_touch_input[0].display_y = (int16_t)(ft81x_ctouch.touch0_xy & 0xffff);
 
-  // read in a few other touch registers
-  ft81x_ctouch.mode = ft81x_rd32(REG_CTOUCH_MODE) & 0x03;
-  ft81x_ctouch.extended = ft81x_rd32(REG_CTOUCH_EXTENDED) & 0x01;
+		ft81x_touch_input[1].tag = ft81x_ctouch.tag1;
+		ft81x_touch_input[1].tag_x = ft81x_ctouch.tag1_xy >> 16;
+		ft81x_touch_input[1].tag_y = ft81x_ctouch.tag1_xy & 0xffff;
+		ft81x_touch_input[1].display_x = (int16_t)(ft81x_ctouch.touch1_xy >> 16);
+		ft81x_touch_input[1].display_y = (int16_t)(ft81x_ctouch.touch1_xy & 0xffff);
 
-  // Read in the ctouch registers depending on multitouch mode some or all.
-  if (!ft81x_ctouch.extended) {
-    // Read in our all ctouch registers. Most are continuous but the last 3 are not :(
-    // If we are in single touch mode then we only need a few registers.
-    ft81x_rdN(REG_CTOUCH_TOUCH1_XY, (uint8_t *)&ft81x_ctouch.touch1_xy, sizeof(ft81x_ctouch)-(3*4));
-    //// Patch in the last 3 values.
-    ft81x_ctouch.touch4_x = ft81x_rd32(REG_CTOUCH_TOUCH4_X);
-    ft81x_ctouch.touch2_xy = ft81x_rd32(REG_CTOUCH_TOUCH2_XY);
-    ft81x_ctouch.touch3_xy = ft81x_rd32(REG_CTOUCH_TOUCH3_XY);
-  } else {
-    // Only bring in TOUCH0_XY, TAG0_XY and TAG0 for single touch mode
-    ft81x_rdN(REG_CTOUCH_TOUCH0_XY, (uint8_t *)&ft81x_ctouch.touch0_xy, 4*3);
-  }
+		ft81x_touch_input[2].tag = ft81x_ctouch.tag2;
+		ft81x_touch_input[2].tag_x = ft81x_ctouch.tag2_xy >> 16;
+		ft81x_touch_input[2].tag_y = ft81x_ctouch.tag2_xy & 0xffff;
+		uint32_t touch_xy = ft81x_rd32(REG_CTOUCH_TOUCH2_XY);
+		ft81x_touch_input[2].display_x = (int16_t)(touch_xy >> 16);
+		ft81x_touch_input[2].display_y = (int16_t)(touch_xy & 0xffff);
+
+		ft81x_touch_input[3].tag = ft81x_ctouch.tag3;
+		ft81x_touch_input[3].tag_x = ft81x_ctouch.tag3_xy >> 16;
+		ft81x_touch_input[3].tag_y = ft81x_ctouch.tag3_xy & 0xffff;
+		touch_xy = ft81x_rd32(REG_CTOUCH_TOUCH3_XY);
+		ft81x_touch_input[3].display_x = (int16_t)(touch_xy >> 16);
+		ft81x_touch_input[3].display_y = (int16_t)(touch_xy & 0xffff);
+
+		ft81x_touch_input[4].tag = ft81x_ctouch.tag4;
+		ft81x_touch_input[4].tag_x = ft81x_ctouch.tag4_xy >> 16;
+		ft81x_touch_input[4].tag_y = ft81x_ctouch.tag4_xy & 0xffff;
+		ft81x_touch_input[4].display_x = (int16_t)ft81x_rd16(REG_CTOUCH_TOUCH4_X);
+		ft81x_touch_input[4].display_y = (int16_t)(ft81x_ctouch.touch4_y & 0xffff);
+	} else {
+		struct {
+			uint32_t touch0_xy;
+			uint32_t tag0_xy;
+			uint32_t tag0;
+		} ft81x_ctouch;
+		// Only bring in TOUCH0_XY, TAG0_XY and TAG0 for single touch mode
+		ft81x_rdN(REG_CTOUCH_TOUCH0_XY, (uint8_t *)&ft81x_ctouch, sizeof(ft81x_ctouch));
+		ft81x_touch_input[0].tag = ft81x_ctouch.tag0;
+		ft81x_touch_input[0].tag_x = ft81x_ctouch.tag0_xy >> 16;
+		ft81x_touch_input[0].tag_y = ft81x_ctouch.tag0_xy & 0xffff;
+		ft81x_touch_input[0].display_x = (int16_t)(ft81x_ctouch.touch0_xy >> 16);
+		ft81x_touch_input[0].display_y = (int16_t)(ft81x_ctouch.touch0_xy & 0xffff);
+	}
 #if 0
-  ESP_LOGW(TAG, "ttag: %i val: 0x%08x", ft81x_touch.tracker0.tag_value, ft81x_touch.tracker0.track_value);
-  ESP_LOGW(TAG, "ctag0: %i xy: 0x%08x", ft81x_ctouch.tag0, ft81x_ctouch.tag0_xy);
+	ESP_LOGW(TAG, "ttag0: %i val: 0x%08x", ft81x_touch_tracker[0].tag, ft81x_touch_tracker[0].value);
+	ESP_LOGW(TAG, "ctag0: %i xy: 0x%04x,0x%04x", ft81x_touch_input[0].tag, ft81x_touch_input[0].tag_x, ft81x_touch_input[0].tag_y);
 #endif
 }
 

@@ -286,60 +286,38 @@
 #define CMD_PINDRIVE       0x70   // Pin driver power levels
 #define PIN_PD_STATE       0x71   // Pin state when powered down Float/Pull-Down
 
+#define FT81X_TOUCH_POINTS 5
+#define FT81X_TRACKER_UNITS 65535
+
 /*
  * Types
  */
 
 // FT813 touch screen state loaded by calls to get_touch_inputs
 //// Capacitive touch state
-struct ft81x_ctouch_t {
- uint8_t mode;
- uint8_t extended;
- uint32_t touch1_xy;
- uint32_t touch4_y;
- uint32_t touch0_xy;
- uint32_t tag0_xy;
- uint32_t tag0;
- uint32_t tag1_xy;
- uint32_t tag1;
- uint32_t tag2_xy;
- uint32_t tag2;
- uint32_t tag3_xy;
- uint32_t tag3;
- uint32_t tag4_xy;
- uint32_t tag4;
- uint32_t touch4_x;
- uint32_t touch2_xy;
- uint32_t touch3_xy;
+struct ft81x_touch_input_t {
+	uint16_t tag;
+	uint16_t tag_x;
+	uint16_t tag_y;
+	int16_t display_x; //no-touch: -32768
+	int16_t display_y; //no-touch: -32768
 };
 
 //// touch tracker state
-struct  ft81x_touch_t {
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker0;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker1;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker2;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker3;
-  struct {
-    uint16_t tag_value;
-    uint16_t track_value;
-  } tracker4;
+struct ft81x_touch_tracker_t {
+	uint16_t tag;
+	uint16_t value;
 };
 
 /*
  * Prototypes
  */
+
+bool ft81x_multi_touch_enabled();
+void ft81x_multi_touch_enable(
+	bool enable
+);
+uint8_t ft81x_touch_mode();
 
 // Initialize the ESP32 SPI device driver for the FT81X chip attached to the VSPI pins
 bool ft81x_initSPI();
