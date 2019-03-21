@@ -195,6 +195,7 @@
 #define REG_SNAPY            0x302014UL // 11RW Scanline select for RENDERMODE 1
 #define REG_SNAPSHOT         0x302018UL //  1RW Trigger for RENDERMODE 1
 #define REG_SNAPFORMAT       0x30201cUL //  6RW Pixel format for scanline redout
+#define REG_CPURESET         0x302020UL //  3RW Reset Coprocessor/Touch/Audio engine
 #define REG_TAP_CRC          0x302024UL // 32RO Live video tap crc. Frame CRC is
 #define REG_TAP_MASK         0x302028UL // 32RW Live video tap mask
 #define REG_HCYCLE           0x30202CUL // 12RW Horizontal total cycle count
@@ -237,7 +238,9 @@
 #define REG_PWM_DUTY         0x3020d4UL //  8RW Back-light PWM duty cycle
 #define REG_PWM_HZ           0x3020d0UL // 14RW PWM output frequencey 250Hz-10000Hz
 #define REG_CMD_READ         0x3020f8UL // 12RW Command buffer read pointer
-#define REG_CMD_WRITE        0x3020fcUL // 12RO Command buffer write pointer
+#define REG_CMD_WRITE        0x3020fcUL // 12RW Command buffer write pointer
+#define REG_CMDB_SPACE       0x302574UL // 12RW Free space in RAM_CMD
+#define REG_CMDB_WRITE       0x302578UL // 32WO Data or Command to be written to RAM_CMD
 
 // CTE Registers
 #define REG_CTOUCH_MODE      0x302104UL //  2RW 00=Off 11=On
@@ -382,10 +385,6 @@ uint16_t ft81x_rp();
 
 // Write out padded bits to be sure we are 32 bit aligned as required by the FT81X
 void ft81x_align(uint32_t written);
-
-// Set the address and write mode pointer to the command buffer
-// leaving the CS line enabled for further data
-void ft81x_start(uint32_t addr, uint8_t write);
 
 // Set the current address and write mode to the fifo comand buffer
 // leaving the CS line enabled

@@ -1329,38 +1329,6 @@ void ft81x_align(uint32_t written) {
 }
 
 /*
- * Start a new transactions to write to the command buffer at the current write pointer
- * rw = 1 is a write operation and will set the write bit.
- * Use tx_buffer to transmit only 24 bits.
- */
-void ft81x_start(uint32_t addr, uint8_t write) {
-  // setup trans memory
-  spi_transaction_ext_t trans;
-  memset(&trans, 0, sizeof(trans));
-
-  // set trans options.
-  if (ft81x_qio) {
-    // Tell the ESP32 SPI ISR to accept MODE_XXX for QIO and DIO
-    trans.base.flags |= SPI_TRANS_MODE_DIOQIO_ADDR;
-    // Set this transaction to QIO
-    trans.base.flags |= SPI_TRANS_MODE_QIO;
-  }
-
-  // set write bit if rw=1
-  addr |= (write ? 0x800000 : 0);
-  addr = SPI_REARRANGE_DATA(addr, 24);
-
-  trans.base.length = 24;
-  trans.base.tx_buffer = &addr;
-
-  // start the transaction ISR watches CS bit
-  ft81x_cs(0); // active CS
-
-  // transmit our transaction to the ISR
-  spi_device_transmit(ft81x_spi, (spi_transaction_t*)&trans);
-}
-
-/*
  * Start a new transactions to write to the command buffer at the current write pointer.
  * Assert CS pin.
  */
@@ -1368,7 +1336,7 @@ void ft81x_stream_start() {
   // be sure we ended the last tranaction
   ft81x_stream_stop();
   // begin a new write transaction.
-  ft81x_start(RAM_CMD + (ft81x_wp & 0xfff), WRITE_OP);
+  ft81x_wrA(RAM_CMD + (ft81x_wp & 0xffc));
 }
 
 /*
@@ -1526,7 +1494,7 @@ void ft81x_cSPOOL(uint8_t *buffer, int32_t size) {
 /*
  * Wait until REG_CMD_READ == REG_CMD_WRITE indicating
  * the GPU has processed all of the commands in the
- * circular commad buffer
+ * circular command buffer
  */
 void ft81x_wait_finish() {
 #if 0
@@ -1539,6 +1507,7 @@ void ft81x_wait_finish() {
   #endif  
   while ( ((rp=ft81x_rp()) != ft81x_wp) ) {
   }
+  ft81x_freespace = (4096 - 4);
 }
 
 void ft81x_multi_touch_enable(
