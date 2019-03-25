@@ -37,12 +37,18 @@
  */
 
 // General settings/utils
-//// For breadboard use 4Mhz or less
-#define FT81X_SPI_SPEED 4000000
-
 //// QUAD SPI is not stable yet. Noise or ...?
 //// Enable QUAD spi mode on ESP32 and FT81X
 #define FT81X_QUADSPI         0
+
+#define SPI_WIDTH_SINGLE 0b0
+#define SPI_WIDTH_DUAL 0b01
+#define SPI_WIDTH_QUAD 0b10
+
+#define DL_CMD_FAULT 0xfff
+#define MAX_FIFO_SPACE (4096 - 4)
+#define FT81X_DISPLAY_WIDTH 800
+#define FT81X_DISPLAY_HEIGHT 480
 
 // Currently with DMA setting of 0 the ESP32 can only transfer 32 bytes per transaction.
 // Setting DMA mode > 0 has other issues with data not readable. Bugs that may change
@@ -187,7 +193,8 @@
 #define RAM_CMD        0x308000UL // Command Buffer
 
 // REGISTERS                             BITSRW DESC
-#define REG_ID               0x302000UL //  8RO Chip id 0x7ch
+#define MEM_CHIP_ID          0x0c0000UL // 32RW Chip id 08h, [id], 01h, 00h: FT8xx=10h, 11h, 12h, 13h
+#define REG_ID               0x302000UL //  8RO id register = 0x7ch
 #define REG_FRAMES           0x302004UL // 32RO frame counter since reset
 #define REG_CLOCK            0x302008UL // 32RO Clock cyc since reset
 #define REG_FREQUENCY        0x30200cUL // 28RW Main clock frequency (Hz)
@@ -283,8 +290,9 @@
 #define CMD_PD_ROMS        0x49   // Select power down individual ROMs.
 #define CMD_CLKEXT         0x44   // Select PLL input from external osc.
 #define CMD_CLKINT         0x48   // Select PLL input from internal osc.
-#define CMD_CLKSEL_A       0x61   // Set clock in sleep mode. TODO: why 2?
-#define CMD_CLKSEL_B       0x62   // ""
+#define CMD_PWRDOWN2       0x50   // Switch off 1.2v core voltage. SPI still on.
+#define CMD_CLKSEL         0x61   // Set clock in sleep mode. TODO: why 2?
+#define CMD_CLKSEL2        0x62   // ""
 #define CMD_RST_PULSE      0x68   // Send reset pulse to FT81x core.
 #define CMD_PINDRIVE       0x70   // Pin driver power levels
 #define PIN_PD_STATE       0x71   // Pin state when powered down Float/Pull-Down
@@ -323,10 +331,10 @@ void ft81x_multi_touch_enable(
 uint8_t ft81x_touch_mode();
 
 // Initialize the ESP32 SPI device driver for the FT81X chip attached to the VSPI pins
-bool ft81x_initSPI();
+bool ft81x_init_spi();
 
 // Initialize FT81X GPU
-bool ft81x_initGPU();
+bool ft81x_init_gpu();
 
 // Put the display to sleep low power mode
 void ft81x_sleep();
@@ -335,16 +343,14 @@ void ft81x_sleep();
 void ft81x_wake(uint8_t pwm);
 
 // reset the fifo state vars
-void ft81x_reset_fifo();
+void ft81x_fifo_reset();
 
 // Get our current fifo write state location
 uint32_t ft81x_getwp();
 
-// Wrapper for CS to allow easier debugging
-void ft81x_cs(uint8_t n);
-
 // Send a Host Command to the FT81X chip see 4.1.5 Host Command
-void ft81x_hostcmd(uint8_t command, uint8_t args);
+#define ft81x_hostcmd(command) ft81x_hostcmd_param((command), 0)
+void ft81x_hostcmd_param(uint8_t command, uint8_t args);
 
 // Send a 16 bit address + dummy and read the 8 bit response
 uint8_t ft81x_rd(uint32_t addr);
@@ -381,7 +387,7 @@ void ft81x_wr16(uint32_t addr, uint16_t word);
 void ft81x_wr32(uint32_t addr, uint32_t word);
 
 // Read the FT81x command pointer
-uint16_t ft81x_rp();
+uint16_t ft81x_fifo_rp();
 
 // Write out padded bits to be sure we are 32 bit aligned as required by the FT81X
 void ft81x_align(uint32_t written);
